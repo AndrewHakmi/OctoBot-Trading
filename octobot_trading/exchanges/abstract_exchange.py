@@ -15,6 +15,7 @@
 #  License along with this library.
 import typing
 import decimal
+import time
 
 import octobot_commons.constants
 import octobot_commons.enums as common_enums
@@ -27,6 +28,7 @@ import octobot_tentacles_manager.api as octobot_tentacles_manager_api
 import octobot_trading.constants
 import octobot_trading.enums as enums
 import octobot_trading.util as util
+import octobot_trading.errors as errors
 
 
 class AbstractExchange(util.Initializable):
@@ -272,7 +274,7 @@ class AbstractExchange(util.Initializable):
         """
         raise NotImplementedError("get_my_recent_trades is not implemented")
 
-    async def cancel_order(self, order_id: str, symbol: str = None, **kwargs: dict) -> bool:
+    async def cancel_order(self, order_id: str, symbol: str = None, **kwargs: dict) -> enums.OrderStatus:
         """
         Cancel a order on the exchange
         :param order_id: the order id
@@ -414,6 +416,21 @@ class AbstractExchange(util.Initializable):
         """
         raise NotImplementedError("get_sub_account_list is not available on this exchange")
 
+    async def retry_till_success(self, timeout, request_func, *args, **kwargs):
+        t0 = time.time()
+        attempt = 1
+        while time.time() - t0 < timeout:
+            try:
+                result = await request_func(*args, **kwargs)
+                if attempt > 1:
+                    self.logger.debug(f"Request retrier success for {request_func.__name__} after {attempt} attempts")
+                return result
+            except errors.FailedRequest:
+                self.logger.debug(f"Request retrier failed for {request_func.__name__} (attempt {attempt})")
+                attempt += 1
+        raise errors.FailedRequest(f"Failed to successfully run request {request_func.__name__} after {attempt} "
+                                   f"attempts.")
+
     """
     Parsers
     """
@@ -521,34 +538,6 @@ class AbstractExchange(util.Initializable):
         raise NotImplementedError("parse_account is not implemented")
 
     """
-    Cleaners
-    """
-
-    def clean_recent_trade(self, recent_trade):
-        """
-        Clean the specified recent trade list
-        :param recent_trade: the recent trade list
-        :return: the cleaned recent trade list
-        """
-        raise NotImplementedError("clean_recent_trade is not implemented")
-
-    def clean_trade(self, trade):
-        """
-        Clean the specified trade dict
-        :param trade: the trade dict
-        :return: the cleaned trade dict
-        """
-        raise NotImplementedError("clean_trade is not implemented")
-
-    def clean_order(self, order):
-        """
-        Clean the specified order dict
-        :param order: the order dict
-        :return: the cleaned order dict
-        """
-        raise NotImplementedError("clean_order is not implemented")
-
-    """
     Uniformization
     """
 
@@ -648,6 +637,7 @@ class AbstractExchange(util.Initializable):
 
     @classmethod
     def load_user_inputs(cls, tentacles_setup_config, tentacle_config):
+        logger = logging.get_logger(cls.get_name())
         inputs = {}
         try:
             tentacle_config.update(
@@ -662,7 +652,9 @@ class AbstractExchange(util.Initializable):
             with cls.UI.local_factory(cls, lambda: tentacle_config):
                 cls.init_user_inputs(inputs)
         except Exception as e:
-            logging.get_logger(cls.get_name()).exception(e, True, f"Error when initializing user inputs: {e}")
+            logger.exception(e, True, f"Error when initializing user inputs: {e}")
+        if tentacle_config:
+            logger.debug(f"Using config: {tentacle_config}")
         return inputs
 
     @classmethod

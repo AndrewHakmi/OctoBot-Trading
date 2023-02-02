@@ -50,6 +50,12 @@ class AbstractTradingModeConsumer(modes_channel.ModeChannelConsumer):
         except errors.MissingMinimalExchangeTradeVolume:
             self.logger.info(f"Not enough funds to create a new order: {self.exchange_manager.exchange_name} "
                              f"exchange minimal order volume has not been reached.")
+        except errors.UnhandledContractError as err:
+            self.logger.error(f"Unhandled contract error on {self.exchange_manager.exchange_name}: {err}. "
+                              f"Please make sure that {symbol} is the full futures contract symbol. "
+                              f"Future contract symbols contain the settlement currency after ':'. "
+                              f"Example: use BTC/USDT:USDT for linear BTC/USDT contracts and "
+                              f"BTC/USD:BTC for inverse BTC/USD contracts.")
         except errors.OrderCreationError:
             self.logger.info(f"Failed order creation on: {self.exchange_manager.exchange_name} "
                              f"an unexpected error happened when creating order. This is likely due to "
@@ -88,8 +94,8 @@ class AbstractTradingModeConsumer(modes_channel.ModeChannelConsumer):
                             self.logger.error(f"Failed to create order on second attempt : {e})")
                     except Exception as e:
                         self.logger.exception(e, True, f"Error when creating order: {e}")
-            self.logger.debug(f"Skipping order creation for {symbol} on {self.exchange_manager.exchange_name}: "
-                              f"not enough available funds")
+            self.logger.info(f"Skipping order creation for {symbol} on {self.exchange_manager.exchange_name}: "
+                             f"not enough available funds")
             return []
         finally:
             self.logger.debug(f"Exiting create_order_if_possible for {symbol}")

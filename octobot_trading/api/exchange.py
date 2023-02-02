@@ -19,6 +19,7 @@ import trading_backend
 
 import octobot_trading.constants
 import octobot_trading.enums
+import octobot_trading.exchanges.connectors.ccxt.enums
 import octobot_trading.exchanges as exchanges
 import octobot_trading.exchange_data as exchange_data
 
@@ -41,14 +42,15 @@ def get_exchange_manager_from_exchange_name_and_id(exchange_name: str, exchange_
     return exchanges.Exchanges.instance().get_exchange(exchange_name, exchange_id).exchange_manager
 
 
-async def get_exchange_available_time_frames(
+async def get_ccxt_exchange_available_time_frames(
         exchange_name: str,
-        exchange_lib: octobot_trading.enums.ExchangeWrapperLibs = octobot_trading.enums.ExchangeWrapperLibs.CCXT
+        exchange_lib: octobot_trading.exchanges.connectors.ccxt.enums.ExchangeWrapperLibs =
+        octobot_trading.exchanges.connectors.ccxt.enums.ExchangeWrapperLibs.CCXT
 ) -> list:
     """
     When using CCXT, prefer using the sync lib since no request is required to get time frames
     :param exchange_name: name of the exchange
-    :param exchange_lib: octobot_trading.enums.ExchangeWrapperLibs to use
+    :param exchange_lib: octobot_trading.exchanges.connectors.ccxt.enums.ExchangeWrapperLibs to use
     :return: the list of time frames
     """
     try:
@@ -159,8 +161,12 @@ def get_exchange_name(exchange_manager) -> str:
     return exchange_manager.get_exchange_name()
 
 
+def get_exchange_type(exchange_manager) -> octobot_trading.enums.ExchangeTypes:
+    return exchanges.get_exchange_type(exchange_manager)
+
+
 def has_only_ohlcv(exchange_importers):
-    return exchanges.ExchangeSimulator.get_real_available_data(exchange_importers) == \
+    return exchanges.ExchangeSimulatorConnector.get_real_available_data(exchange_importers) == \
            set(exchange_data.SIMULATOR_PRODUCERS_TO_POSSIBLE_DATA_TYPE[octobot_trading.constants.OHLCV_CHANNEL])
 
 
@@ -193,6 +199,14 @@ def supports_websockets(exchange_name: str, tentacles_setup_config) -> bool:
 # TODO remove after ccxt symbols update
 def get_trading_pairs(exchange_manager) -> list:
     return exchange_manager.exchange_config.traded_symbol_pairs
+
+
+def get_all_exchange_symbols(exchange_manager) -> list:
+    return exchange_manager.client_symbols
+
+
+def get_all_exchange_time_frames(exchange_manager) -> list:
+    return exchange_manager.client_time_frames
 
 
 def get_trading_symbols(exchange_manager) -> list:
@@ -236,6 +250,10 @@ def is_overloaded(exchange_manager) -> bool:
 async def is_compatible_account(exchange_name: str, exchange_config: dict, tentacles_setup_config, is_sandboxed: bool) \
         -> (bool, bool, str):
     return await exchanges.is_compatible_account(exchange_name, exchange_config, tentacles_setup_config, is_sandboxed)
+
+
+def get_default_exchange_type(exchange_name: str) -> str:
+    return exchanges.get_default_exchange_type(exchange_name)
 
 
 def is_sponsoring(exchange_name: str) -> bool:

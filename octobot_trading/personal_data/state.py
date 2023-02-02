@@ -23,6 +23,8 @@ import octobot_trading.util as util
 
 
 class State(util.Initializable):
+    PENDING_REFRESH_INTERVAL = 2
+
     def __init__(self, is_from_exchange_data):
         super().__init__()
 
@@ -34,6 +36,12 @@ class State(util.Initializable):
 
         # state lock
         self.lock = asyncio.Lock()
+
+        # set after self.terminate has been executed (with or without raised exception)
+        self.terminated = asyncio.Event()
+
+        # set at True after synchronize has been called
+        self.has_already_been_synchronized_once = False
 
     def is_pending(self) -> bool:
         """
@@ -95,10 +103,16 @@ class State(util.Initializable):
                 self.log_event_message(enums.StatesMessages.SYNCHRONIZING)
                 await self.synchronize()
             else:
-                async with self.lock:
-                    await self.terminate()
+                await self.trigger_terminate()
         else:
             self.log_event_message(enums.StatesMessages.ALREADY_SYNCHRONIZING)
+
+    async def trigger_terminate(self):
+        try:
+            async with self.lock:
+                await self.terminate()
+        finally:
+            self.on_terminate()
 
     async def synchronize(self, force_synchronization=False, catch_exception=False) -> None:
         """
@@ -117,6 +131,8 @@ class State(util.Initializable):
                 self.log_event_message(enums.StatesMessages.SYNCHRONIZING_ERROR, error=e)
             else:
                 raise
+        finally:
+            self.has_already_been_synchronized_once = True
 
     async def synchronize_with_exchange(self, force_synchronization: bool = False) -> None:
         """
@@ -133,6 +149,7 @@ class State(util.Initializable):
 
     @contextlib.asynccontextmanager
     async def refresh_operation(self):
+        self.get_logger().debug("Starting refresh_operation")
         previous_state = self.state
         async with self.lock:
             self.state = enums.States.REFRESHING
@@ -142,6 +159,7 @@ class State(util.Initializable):
             async with self.lock:
                 if self.state is enums.States.REFRESHING:
                     self.state = previous_state
+            self.get_logger().debug("Completed refresh_operation")
 
     async def _synchronize_with_exchange(self, force_synchronization: bool = False) -> None:
         """
@@ -156,6 +174,26 @@ class State(util.Initializable):
         Can be portfolio updates, fees request, orders group updates, Trade creation etc...
         """
         raise NotImplementedError("terminate not implemented")
+
+    def on_terminate(self) -> None:
+        """
+        Called after terminate is complete
+        """
+        self.get_logger().debug(f"{self.__class__.__name__} terminated")
+        if not self.terminated.is_set():
+            self.terminated.set()
+
+    def __del__(self):
+        if not self.terminated.is_set() and self.terminated._waiters:
+            self.get_logger().error(f"{self.__class__.__name__} deleted before the terminated "
+                                    f"event has been set while tasks are waiting for it. "
+                                    f"Force setting event.")
+            self.terminated.set()
+
+    async def wait_for_terminate(self, timeout) -> None:
+        if self.terminated.is_set():
+            return
+        await asyncio.wait_for(self.terminated.wait(), timeout=timeout)
 
     async def on_refresh_successful(self):
         """

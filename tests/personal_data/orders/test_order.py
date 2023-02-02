@@ -141,7 +141,7 @@ def test_parse_order_type():
     }
     untyped_raw_with_maker_order = {
         enums.ExchangeConstantsOrderColumns.SIDE.value: enums.TradeOrderSide.BUY.value,
-        enums.ExchangeConstantsOrderColumns.TAKERORMAKER.value: enums.ExchangeConstantsOrderColumns.MAKER.value,
+        enums.ExchangeConstantsOrderColumns.TAKER_OR_MAKER.value: enums.ExchangeConstantsOrderColumns.MAKER.value,
         enums.ExchangeConstantsOrderColumns.TYPE.value: None,
     }
     typed_raw_order = {
@@ -167,14 +167,14 @@ def test_parse_order_type():
 def test_update_from_raw(trader_simulator):
     config, exchange_manager_inst, trader_inst = trader_simulator
     order_inst = personal_data.Order(trader_inst)
-    # Binance example market order
+    # binance example market order
     raw_order = {
         'id': '362550114',
         'clientOrderId': 'x-T9698eeeeeeeeeeeeee792',
         'timestamp': 1637579281.377,
         'datetime': '2021-11-22T11:08:01.377Z',
         'lastTradeTimestamp': None,
-        'symbol': 'WIN/USDT',
+        'symbol': 'UNI/USDT',
         'type': 'market',
         'timeInForce': 'GTC',
         'postOnly': False,
@@ -196,8 +196,8 @@ def test_update_from_raw(trader_simulator):
     assert order_inst.order_id == "362550114"
     assert order_inst.side is enums.TradeOrderSide.SELL
     assert order_inst.status is enums.OrderStatus.CLOSED
-    assert order_inst.symbol == "WIN/USDT"
-    assert order_inst.currency == "WIN"
+    assert order_inst.symbol == "UNI/USDT"
+    assert order_inst.currency == "UNI"
     assert order_inst.market == "USDT"
     assert order_inst.taker_or_maker is enums.ExchangeConstantsMarketPropertyColumns.TAKER.value
     assert order_inst.origin_price == constants.ZERO
@@ -210,17 +210,21 @@ def test_update_from_raw(trader_simulator):
     assert order_inst.timestamp == 1637579281.377
     assert order_inst.canceled_time == 0
     assert order_inst.executed_time == 1637579281.377
-    assert order_inst.fee == {'cost': decimal.Decimal('0.03764836'), 'currency': 'USDT'}
+    assert order_inst.fee == {
+        enums.FeePropertyColumns.COST.value: decimal.Decimal('0.03764836'),
+        enums.FeePropertyColumns.CURRENCY.value: 'USDT',
+        enums.FeePropertyColumns.IS_FROM_EXCHANGE.value: True,
+    }
 
     order_inst = personal_data.Order(trader_inst)
-    # Binance example limit order
+    # binance example limit order
     raw_order = {
         'id': '362550114',
         'clientOrderId': 'x-T9698eeeeeeeeeeeeee792',
         'timestamp': 1637579281.377,
         'datetime': '2021-11-22T11:08:01.377Z',
         'lastTradeTimestamp': None,
-        'symbol': 'WIN/USDT',
+        'symbol': 'UNI/USDT',
         'type': 'limit',
         'timeInForce': 'GTC',
         'postOnly': False,
@@ -242,8 +246,8 @@ def test_update_from_raw(trader_simulator):
     assert order_inst.order_id == "362550114"
     assert order_inst.side is enums.TradeOrderSide.BUY
     assert order_inst.status is enums.OrderStatus.CLOSED
-    assert order_inst.symbol == "WIN/USDT"
-    assert order_inst.currency == "WIN"
+    assert order_inst.symbol == "UNI/USDT"
+    assert order_inst.currency == "UNI"
     assert order_inst.market == "USDT"
     assert order_inst.taker_or_maker is enums.ExchangeConstantsMarketPropertyColumns.MAKER.value
     assert order_inst.origin_price == decimal.Decimal("12.664")
@@ -256,7 +260,11 @@ def test_update_from_raw(trader_simulator):
     assert order_inst.timestamp == 1637579281.377
     assert order_inst.canceled_time == 0
     assert order_inst.executed_time == 1637579281.377
-    assert order_inst.fee == {'cost': decimal.Decimal('0.03764836'), 'currency': 'USDT'}
+    assert order_inst.fee == {
+        enums.FeePropertyColumns.COST.value: decimal.Decimal('0.03764836'),
+        enums.FeePropertyColumns.CURRENCY.value: 'USDT',
+        enums.FeePropertyColumns.IS_FROM_EXCHANGE.value: True,
+    }
 
 
 async def test_set_as_chained_order(trader_simulator):

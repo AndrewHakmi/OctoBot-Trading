@@ -169,27 +169,26 @@ class HistoricalPortfolioValueManager(util.Initializable):
         if self.portfolio_manager.portfolio is None or self.portfolio_manager.portfolio.portfolio is None:
             self.logger.debug("Ignoring portfolio values in history: portfolio_manager.portfolio is not initialized")
             return
-        self.ending_portfolio = portfolio_util.portfolio_to_float(
+        self.ending_portfolio = portfolio_util.filter_empty_values(portfolio_util.portfolio_to_float(
             self.portfolio_manager.portfolio.portfolio
-        )
+        ))
         if self.starting_portfolio is None:
             if self.portfolio_manager.portfolio_value_holder.origin_portfolio is None \
                     or not self.portfolio_manager.portfolio_value_holder.origin_portfolio.portfolio:
                 # origin portfolio might not be initialized, use ending_portfolio
                 self.starting_portfolio = copy.deepcopy(self.ending_portfolio)
             else:
-                self.starting_portfolio = portfolio_util.portfolio_to_float(
+                self.starting_portfolio = portfolio_util.filter_empty_values(portfolio_util.portfolio_to_float(
                     self.portfolio_manager.portfolio_value_holder.origin_portfolio.portfolio
-                )
+                ))
 
     async def save_historical_portfolio_value(self, update_data=True):
         if update_data:
             self.last_update_time = self.portfolio_manager.exchange_manager.exchange.get_exchange_current_time()
             self._update_portfolios()
-        await self.portfolio_manager.exchange_manager.storage_manager.portfolio_storage.save_historical_portfolio_value(
-            self._get_metadata(),
-            [historical_asset.to_dict() for historical_asset in self.historical_portfolio_value.values()]
-        )
+        if not self.portfolio_manager.exchange_manager.is_backtesting:
+            # in backtesting, history is stored at the end
+            await self.portfolio_manager.exchange_manager.storage_manager.store_history()
 
     async def _reload_historical_portfolio_value(self):
         db = self.portfolio_manager.exchange_manager.storage_manager.portfolio_storage.get_db()
@@ -276,7 +275,10 @@ class HistoricalPortfolioValueManager(util.Initializable):
                     )
         raise errors.MissingPriceDataError(f"no price data to evaluate {historical_value} on {target_currency}")
 
-    def _get_metadata(self):
+    def get_dict_historical_values(self):
+        return [historical_asset.to_dict() for historical_asset in self.historical_portfolio_value.values()]
+
+    def get_metadata(self):
         return {
             self.DATA_SOURCE_KEY: self.data_source,
             self.DATA_VERSION_KEY: self.version,

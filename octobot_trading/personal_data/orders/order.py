@@ -108,7 +108,8 @@ class Order(util.Initializable):
         self.has_been_bundled = False
         # True when this order is to be opened as a chained order and has not been open yet
         self.is_waiting_for_chained_trigger = False
-        # params give to the exchange request when this order is created
+        # Params given to the exchange request when this order is created. Include any exchange specific param here.
+        # All params and values in those will be ignored in simulated orders
         self.exchange_creation_params = {}
         # kwargs given to trader.create_order() when this order should be created later on
         self.trader_creation_kwargs = {}
@@ -127,7 +128,7 @@ class Order(util.Initializable):
                quantity_filled=constants.ZERO, filled_price=constants.ZERO, average_price=constants.ZERO,
                fee=None, total_cost=constants.ZERO, timestamp=None,
                order_type=None, reduce_only=None, close_position=None, position_side=None, fees_currency_side=None,
-               group=None, tag=None, quantity_currency=None) -> bool:
+               group=None, tag=None, quantity_currency=None, exchange_creation_params=None) -> bool:
         changed: bool = False
         should_update_total_cost = False
 
@@ -140,23 +141,17 @@ class Order(util.Initializable):
 
         if quantity_currency is None:
             if self.quantity_currency is None and self.symbol is not None:
-                try:
-                    side = self.get_position_side(
-                        self.exchange_manager.exchange.get_pair_future_contract(self.symbol)
-                    ) if self.exchange_manager.is_future else None
-                    self.quantity_currency = order_util.get_order_quantity_currency(
-                        self.exchange_manager,
-                        self.symbol,
-                        side
-                    )
-                except (errors.InvalidPositionSide, errors.ContractExistsError) as e:
-                    logging.get_logger(self.get_logger_name()).warning(f"Can't infer quantity_currency: {e}")
+                self.quantity_currency = order_util.get_order_quantity_currency(self.exchange_manager, self.symbol)
         else:
             self.quantity_currency = quantity_currency
 
         if status and self.status != status:
-            self.status = status
-            changed = True
+            # ensure the order status is compatible with the state to avoid exchange sync issues
+            if self.state is None or self.state.allows_new_status(status):
+                self.status = status
+                changed = True
+            else:
+                logging.get_logger(self.get_logger_name()).debug(f"Ignored unexpected new status: {status}")
         if not self.status:
             self.status = enums.OrderStatus.OPEN
 
@@ -259,6 +254,9 @@ class Order(util.Initializable):
         if tag is not None:
             self.tag = tag
 
+        if exchange_creation_params is not None:
+            self.exchange_creation_params = exchange_creation_params
+
         if should_update_total_cost and not total_cost:
             self._update_total_cost()
 
@@ -351,11 +349,21 @@ class Order(util.Initializable):
 
     async def on_pending_creation(self, is_from_exchange_data=False):
         with self.order_state_creation():
-            self.state = orders_states.PendingCreationOrderState(self, is_from_exchange_data=is_from_exchange_data)
+            state_class = orders_states.PendingCreationChainedOrderState if self.is_waiting_for_chained_trigger \
+                else orders_states.PendingCreationOrderState
+            self.state = state_class(self, is_from_exchange_data=is_from_exchange_data)
             await self.state.initialize()
 
     async def on_open(self, force_open=False, is_from_exchange_data=False):
         with self.order_state_creation():
+            if isinstance(self.state, orders_states.PendingCreationOrderState):
+                await self.state.trigger_terminate()
+            if isinstance(self.state, orders_states.OpenOrderState):
+                if not self.state.is_initialized:
+                    logging.get_logger(self.get_logger_name()).error(f"on_open called with existing "
+                                                                     f"uninitialized OpenOrderState.")
+                # state has already been created and initialized
+                return
             self.state = orders_states.OpenOrderState(self, is_from_exchange_data=is_from_exchange_data)
             await self.state.initialize(forced=force_open)
 
@@ -414,15 +422,39 @@ class Order(util.Initializable):
         await self.initialize()
 
     def should_be_created(self):
-        return not self.is_created() and self.is_waiting_for_chained_trigger
+        return not self.is_created() and self.is_waiting_for_chained_trigger and \
+            not self._are_simultaneously_triggered_grouped_orders_closed()
+
+    def _are_simultaneously_triggered_grouped_orders_closed(self):
+        if self.triggered_by is None:
+            return False
+        for other_order in self.triggered_by.chained_orders:
+            if other_order is self:
+                return False
+            if self.order_group is not None and self.order_group is other_order.order_group \
+                    and other_order.is_closed():
+                return True
+        return False
+
+    def has_exchange_fetched_fees(self):
+        if not self.fee:
+            return False
+        try:
+            # requires fees to be from exchange and having a not None exchange original cost
+            return self.fee[enums.FeePropertyColumns.IS_FROM_EXCHANGE.value] \
+                   and self.fee[enums.FeePropertyColumns.EXCHANGE_ORIGINAL_COST.value] is not None
+        except KeyError:
+            return False
 
     def get_computed_fee(self, forced_value=None):
+        is_from_exchange = False
         if self.fees_currency_side is enums.FeesCurrencySide.UNDEFINED:
             computed_fee = self.exchange_manager.exchange.get_trade_fee(self.symbol, self.order_type,
                                                                         self.filled_quantity, self.filled_price,
                                                                         self.taker_or_maker)
             value = computed_fee[enums.FeePropertyColumns.COST.value]
             currency = computed_fee[enums.FeePropertyColumns.CURRENCY.value]
+            is_from_exchange = computed_fee[enums.FeePropertyColumns.IS_FROM_EXCHANGE.value]
         else:
             symbol_fees = self.exchange_manager.exchange.get_fees(self.symbol)
             fees = decimal.Decimal(f"{symbol_fees[self.taker_or_maker]}")
@@ -433,8 +465,8 @@ class Order(util.Initializable):
                 value = self.filled_quantity * self.filled_price * fees
                 currency = self.market
         return {
-            enums.FeePropertyColumns.COST.value:
-                forced_value if forced_value is not None else value,
+            enums.FeePropertyColumns.IS_FROM_EXCHANGE.value: is_from_exchange,
+            enums.FeePropertyColumns.COST.value: forced_value if forced_value is not None else value,
             enums.FeePropertyColumns.CURRENCY.value: currency,
         }
 
@@ -467,8 +499,8 @@ class Order(util.Initializable):
 
     def is_self_managed(self):
         return self.trader.allow_artificial_orders and \
-               not self.is_synchronized_with_exchange and \
-               not self.exchange_manager.exchange.is_supported_order_type(self.order_type)
+            not self.is_synchronized_with_exchange and \
+            not self.exchange_manager.exchange.is_supported_order_type(self.order_type)
 
     def is_long(self):
         return self.side is enums.TradeOrderSide.BUY
@@ -516,6 +548,16 @@ class Order(util.Initializable):
     async def update_from_order(self, other_order):
         self.is_synchronized_with_exchange = other_order.is_synchronized_with_exchange
         self.is_from_this_octobot = other_order.is_from_this_octobot
+
+        self.origin_quantity = other_order.origin_quantity
+        self.origin_price = other_order.origin_price
+        self.origin_stop_price = other_order.origin_stop_price
+        self.symbol = other_order.symbol
+        self.currency = other_order.currency
+        self.market = other_order.market
+        self.quantity_currency = other_order.quantity_currency
+        self.taker_or_maker = other_order.taker_or_maker
+        self.side = other_order.side
 
         self.order_id = other_order.order_id
         self.status = other_order.status
@@ -662,7 +704,7 @@ def parse_order_type(raw_order):
         except ValueError as e:
             if raw_order[enums.ExchangeConstantsOrderColumns.TYPE.value] is None:
                 # Last chance: try to infer order type from taker / maker status
-                if enums.ExchangeConstantsOrderColumns.TAKERORMAKER.value in raw_order:
+                if enums.ExchangeConstantsOrderColumns.TAKER_OR_MAKER.value in raw_order:
                     return side, _infer_order_type_from_maker_or_taker(raw_order, side)
                 # No order type info: use unknown order type
                 return side, enums.TraderOrderType.UNKNOWN
@@ -692,7 +734,7 @@ def parse_order_type(raw_order):
 
 
 def _infer_order_type_from_maker_or_taker(raw_order, side):
-    is_taker = raw_order[enums.ExchangeConstantsOrderColumns.TAKERORMAKER.value] \
+    is_taker = raw_order[enums.ExchangeConstantsOrderColumns.TAKER_OR_MAKER.value] \
                == enums.ExchangeConstantsOrderColumns.TAKER.value
     if side is enums.TradeOrderSide.BUY:
         if is_taker:

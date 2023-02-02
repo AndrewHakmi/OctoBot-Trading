@@ -13,6 +13,8 @@
 #
 #  You should have received a copy of the GNU Lesser General Public
 #  License along with this library.
+import asyncio
+
 import octobot_trading.enums as enums
 import octobot_trading.constants as constants
 import octobot_trading.personal_data.orders.order_state as order_state
@@ -48,12 +50,32 @@ class CancelOrderState(order_state.OrderState):
     def is_status_cancelled(self) -> bool:
         return not self.is_status_pending() and self.order.status in constants.CANCEL_ORDER_STATUS_SCOPE
 
+    def allows_new_status(self, status) -> bool:
+        """
+        Don't allow going from canceling to open
+        :return: True if the given status is compatible with the current state
+        """
+        return status in constants.CANCEL_ORDER_STATUS_SCOPE or status in constants.FILL_ORDER_STATUS_SCOPE
+
+    async def _synchronize_with_exchange(self, force_synchronization: bool = False) -> None:
+        """
+        Ask OrdersChannel Internal producer to refresh the order from the exchange
+        :param force_synchronization: When True, for the update of the order from the exchange
+        :return: the result of OrdersProducer.update_order_from_exchange()
+        """
+        if not self.has_already_been_synchronized_once:
+            # If we want to sync this state, it means the order is being canceled by the exchange but is not
+            # fully canceled yet. Giving some time to the exchange before re-requesting it.
+            self.get_logger().debug(f"{self.__class__.__name__} still pending, "
+                                    f"synchronizing in {self.PENDING_REFRESH_INTERVAL}s")
+            await asyncio.sleep(self.PENDING_REFRESH_INTERVAL)
+        await super()._synchronize_with_exchange(force_synchronization=force_synchronization)
+
     async def on_refresh_successful(self):
         """
         Verify the order is properly canceled
         """
         if self.is_status_pending():
-            # TODO manage pending cancel
             await self.update()
         elif self.order.status in constants.CANCEL_ORDER_STATUS_SCOPE:
             self.state = enums.OrderStates.CANCELED
@@ -69,12 +91,14 @@ class CancelOrderState(order_state.OrderState):
         """
         try:
             self.log_event_message(enums.StatesMessages.CANCELLED)
+            self.ensure_not_cleared(self.order)
 
             # set cancel time
             self.order.canceled_time = self.order.exchange_manager.exchange.get_exchange_current_time()
 
             # update portfolio after close
             async with self.order.exchange_manager.exchange_personal_data.portfolio_manager.portfolio.lock:
+                self.ensure_not_cleared(self.order)
                 await self.order.exchange_manager.exchange_personal_data.handle_portfolio_update_from_order(self.order,
                                                                                                             False)
 

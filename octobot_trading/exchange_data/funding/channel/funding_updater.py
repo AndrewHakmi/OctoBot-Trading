@@ -96,8 +96,8 @@ class FundingUpdater(funding_channel.FundingProducer):
                 predicted_funding_rate = \
                     funding.get(enums.ExchangeConstantsFundingColumns.PREDICTED_FUNDING_RATE.value, constants.NaN)
                 await self._push_funding(
-                    symbol=symbol,
-                    funding_rate=decimal.Decimal(funding[enums.ExchangeConstantsFundingColumns.FUNDING_RATE.value]),
+                    symbol,
+                    decimal.Decimal(funding[enums.ExchangeConstantsFundingColumns.FUNDING_RATE.value]),
                     predicted_funding_rate=decimal.Decimal(str(predicted_funding_rate or constants.NaN)),
                     next_funding_time=next_funding_time,
                     last_funding_time=funding[enums.ExchangeConstantsFundingColumns.LAST_FUNDING_TIME.value])
@@ -106,7 +106,7 @@ class FundingUpdater(funding_channel.FundingProducer):
             self.logger.exception(ne, True, f"get_funding_rate is not supported by "
                                             f"{self.channel.exchange_manager.exchange.name} : {ne}")
         except Exception as e:
-            self.logger.error(f"Fail to update funding rate on {self.channel.exchange_manager.exchange.name} : {e}")
+            self.logger.exception(e, True, f"Fail to update funding rate on {self.channel.exchange_manager.exchange.name} : {e}")
         return None
 
     async def _push_funding(self, symbol, funding_rate, predicted_funding_rate=None,

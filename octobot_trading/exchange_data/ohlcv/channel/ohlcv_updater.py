@@ -110,7 +110,6 @@ class OHLCVUpdater(ohlcv_channel.OHLCVProducer):
             return candles
         candles: list = await self.channel.exchange_manager.exchange \
             .get_symbol_prices(pair, time_frame, limit=self.OHLCV_OLD_LIMIT)
-        self.channel.exchange_manager.exchange.uniformize_candles_if_necessary(candles)
         return candles
 
     async def _initialize_candles(self, time_frame, pair, should_retry) \
@@ -129,7 +128,7 @@ class OHLCVUpdater(ohlcv_channel.OHLCVProducer):
         if candles and len(candles) > 1:
             self._set_initialized(pair, time_frame, True)
             await self.channel.exchange_manager.get_symbol_data(pair) \
-                .handle_candles_update(time_frame, candles[:-1], replace_all=True, partial=False)
+                .handle_candles_update(time_frame, candles[:-1], replace_all=True, partial=False, upsert=False)
             self.logger.debug(f"Candle history loaded for {pair} on {time_frame}")
             return pair, time_frame, candles
         elif should_retry:
@@ -182,7 +181,6 @@ class OHLCVUpdater(ohlcv_channel.OHLCVProducer):
                         limit=self.OHLCV_LIMIT)
                     if candles:
                         last_candle: list = candles[-1]
-                        self.channel.exchange_manager.exchange.uniformize_candles_if_necessary(candles)
                     else:
                         last_candle: list = []
 

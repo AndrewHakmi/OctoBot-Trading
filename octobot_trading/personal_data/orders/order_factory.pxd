@@ -20,7 +20,7 @@ cpdef object create_order_from_raw(object trader,
 
 cpdef object create_order_instance_from_raw(object trader,
                                             dict raw_order,
-                                            bint force_open= *)
+                                            bint force_open_or_pending_creation= *)
 
 cpdef object create_order_from_type(object trader,
                                     object order_type,
@@ -46,4 +46,5 @@ cpdef object create_order_instance(object trader,
                                    object tag=*,
                                    object reduce_only=*,
                                    str quantity_currency=*,
-                                   bint close_position=*)
+                                   bint close_position=*,
+                                   dict exchange_creation_params=*)

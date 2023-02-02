@@ -33,6 +33,34 @@ import octobot_tentacles_manager.api as tentacles_manager_api
 import octobot_tentacles_manager.models as tentacles_manager_models
 
 
+def get_base_context(trading_mode, symbol=None, init_call=False):
+    return get_full_context(trading_mode, None, None, symbol, None, None, None, None, None, init_call=init_call)
+
+
+def get_full_context(trading_mode, matrix_id, cryptocurrency, symbol, time_frame, trigger_source, trigger_cache_timestamp,
+                     candle, kline, init_call=False):
+    context = Context(
+        trading_mode,
+        trading_mode.exchange_manager,
+        trading_mode.exchange_manager.trader,
+        trading_mode.exchange_manager.exchange_name,
+        trading_mode.symbol,
+        matrix_id,
+        cryptocurrency,
+        symbol or trading_mode.symbol,
+        time_frame,
+        trading_mode.logger,
+        trading_mode.__class__,
+        trigger_cache_timestamp,
+        trigger_source,
+        candle or kline,
+        None,
+        None,
+    )
+    context.enable_trading = not init_call
+    return context
+
+
 class Context(databases.CacheClient):
     def __init__(
         self,
@@ -71,7 +99,12 @@ class Context(databases.CacheClient):
         self.cryptocurrency = cryptocurrency
         self.signal_symbol = signal_symbol
         self.logger = logger
-        bot_id = exchange_manager.bot_id if exchange_manager else None
+        bot_id = exchange_manager.bot_id if \
+            (exchange_manager is not None) \
+            and (exchange_manager.bot_id is not None) \
+            and databases.RunDatabasesProvider.instance().is_storage_enabled(
+                exchange_manager.bot_id
+            ) else None
         self.run_data_writer = databases.RunDatabasesProvider.instance().get_run_db(bot_id) \
             if bot_id else None
         self.orders_writer = databases.RunDatabasesProvider.instance().get_orders_db(bot_id, self.exchange_name) \
@@ -118,7 +151,7 @@ class Context(databases.CacheClient):
 
     def is_trading_signal_emitter(self):
         try:
-            return self.tentacle.is_trading_signal_emitter()
+            return modes.is_trading_signal_emitter(self.tentacle)
         except AttributeError:
             return False
 

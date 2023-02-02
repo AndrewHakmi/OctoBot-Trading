@@ -32,8 +32,7 @@ import octobot_trading.util as util
 import octobot_trading.exchanges.exchanges as exchanges
 import octobot_trading.exchange_channel as exchanges_channel
 import octobot_trading.modes.channel as modes_channel
-import octobot_trading.modes.script_keywords.basic_keywords as basic_keywords
-import octobot_trading.modes.script_keywords.context_management as context_management
+import octobot_trading.modes.script_keywords as script_keywords
 
 
 class AbstractTradingModeProducer(modes_channel.ModeChannelProducer):
@@ -45,6 +44,7 @@ class AbstractTradingModeProducer(modes_channel.ModeChannelProducer):
         common_enums.ActivationTopics.EVALUATION_CYCLE.value:
             channels_name.OctoBotEvaluatorsChannelsName.MATRIX_CHANNEL.value,
     }
+    CONFIG_INIT_TIMEOUT = 30
 
     def __init__(self, channel, config, trading_mode, exchange_manager):
         super().__init__(channel)
@@ -370,13 +370,10 @@ class AbstractTradingModeProducer(modes_channel.ModeChannelProducer):
                 databases.RunDatabasesProvider.instance().get_run_db(self.trading_mode.bot_id)
             )
         await self._register_and_apply_required_user_inputs(
-            self.get_context(None, None, self.trading_mode.symbol, None, None, None, None, None, True)
+            script_keywords.get_base_context(self.trading_mode, init_call=True)
         )
 
     async def _register_and_apply_required_user_inputs(self, context):
-        if context.exchange_manager.is_future:
-            await basic_keywords.set_leverage(context, await basic_keywords.user_select_leverage(context))
-
         if self.trading_mode.ALLOW_CUSTOM_TRIGGER_SOURCE:
             # register activating topics user input
             activation_topic_values = [
@@ -384,31 +381,16 @@ class AbstractTradingModeProducer(modes_channel.ModeChannelProducer):
                 common_enums.ActivationTopics.FULL_CANDLES.value,
                 common_enums.ActivationTopics.IN_CONSTRUCTION_CANDLES.value
             ]
-            await basic_keywords.get_activation_topics(
+            await script_keywords.get_activation_topics(
                 context,
                 common_enums.ActivationTopics.EVALUATION_CYCLE.value,
                 activation_topic_values
             )
+        await self._apply_exchange_side_config(context)
 
-    def get_context(self, matrix_id, cryptocurrency, symbol, time_frame, trigger_source, trigger_cache_timestamp,
-                    candle, kline, init_call=False):
-        context = context_management.Context(
-            self.trading_mode,
-            self.exchange_manager,
-            self.exchange_manager.trader,
-            self.exchange_name,
-            self.trading_mode.symbol,
-            matrix_id,
-            cryptocurrency,
-            symbol,
-            time_frame,
-            self.logger,
-            self.trading_mode.__class__,
-            trigger_cache_timestamp,
-            trigger_source,
-            candle or kline,
-            None,
-            None,
-        )
-        context.enable_trading = not init_call
-        return context
+    async def _apply_exchange_side_config(self, context):
+        # can be slow, call in a task if necessary
+        if context.exchange_manager.is_future:
+            await util.wait_for_topic_init(self.exchange_manager, self.CONFIG_INIT_TIMEOUT,
+                                           common_enums.InitializationEventExchangeTopics.CONTRACTS.value)
+            await script_keywords.set_leverage(context, await script_keywords.user_select_leverage(context))

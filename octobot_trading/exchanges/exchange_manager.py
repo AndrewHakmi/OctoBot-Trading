@@ -216,8 +216,9 @@ class ExchangeManager(util.Initializable):
             self.client_symbols = list(self.exchange.symbols)
             self.client_time_frames = list(self.exchange.time_frames)
         elif not self.exchange_only:
-            self.logger.error("Failed to load exchange symbols or time frames")
-            self._raise_exchange_load_error()
+            err_message = "Failed to load exchange symbols or time frames"
+            self.logger.error(err_message)
+            self._raise_exchange_load_error(err_message)
 
     def symbol_exists(self, symbol):
         if self.client_symbols is None:
@@ -232,8 +233,8 @@ class ExchangeManager(util.Initializable):
         return time_frame in self.client_time_frames
 
     # Exceptions
-    def _raise_exchange_load_error(self):
-        raise Exception(f"{self.exchange} - Failed to load exchange instances")
+    def _raise_exchange_load_error(self, desc):
+        raise Exception(f"{self.exchange} - Failed to load exchange instances: {desc}")
 
     def get_exchange_name(self):
         return self.exchange_class_string
@@ -260,20 +261,17 @@ class ExchangeManager(util.Initializable):
         return max_handled != constants.INFINITE_MAX_HANDLED_PAIRS_WITH_TIMEFRAME and max_handled < \
             self.get_currently_handled_pair_with_time_frame()
 
-    def should_decrypt_token(self, logger):
+    def should_decrypt_token(self):
         if configuration.has_invalid_default_config_value(
                 self.config[common_constants.CONFIG_EXCHANGES][self.get_exchange_name()].get(
                     common_constants.CONFIG_EXCHANGE_KEY, ''),
                 self.config[common_constants.CONFIG_EXCHANGES][self.get_exchange_name()].get(
                     common_constants.CONFIG_EXCHANGE_SECRET, '')):
-            logger.warning(f"Exchange configuration tokens for {self.get_exchange_name()} are not set yet, "
-                           f"to use OctoBot's real trader's features, "
-                           f"please enter your api tokens in exchange configuration")
             return False
         return True
 
-    def get_exchange_credentials(self, logger, exchange_name):
-        if self.ignore_config or not self.should_decrypt_token(logger) or self.without_auth:
+    def get_exchange_credentials(self, exchange_name):
+        if self.ignore_config or not self.should_decrypt_token() or self.without_auth:
             return "", "", ""
         config_exchange = self.config[common_constants.CONFIG_EXCHANGES][exchange_name]
         return (

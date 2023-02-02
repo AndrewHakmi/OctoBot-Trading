@@ -14,9 +14,12 @@
 #  You should have received a copy of the GNU Lesser General Public
 #  License along with this library
 import decimal
+import os
 
 import octobot_trading.enums as enums
 import octobot_commons.enums as commons_enums
+import octobot_commons.constants as commons_constants
+import octobot_commons.os_util as os_util
 
 # Strings
 CURRENT_PORTFOLIO_STRING = "Current Portfolio :"
@@ -32,7 +35,7 @@ DEFAULT_REFERENCE_MARKET = "BTC"
 CURRENCY_DEFAULT_MAX_PRICE_DIGITS = 8
 
 # Order creation
-ORDER_DATA_FETCHING_TIMEOUT = 60
+ORDER_DATA_FETCHING_TIMEOUT = 5 * commons_constants.MINUTE_TO_SECONDS
 
 # Tentacles
 TRADING_MODE_REQUIRED_STRATEGIES = "required_strategies"
@@ -40,6 +43,8 @@ TRADING_MODE_REQUIRED_STRATEGIES_MIN_COUNT = "required_strategies_min_count"
 TENTACLES_TRADING_MODE_PATH = "Mode"
 CONFIG_CANDLES_HISTORY_SIZE_TITLE = "Candles history size"
 CONFIG_CANDLES_HISTORY_SIZE_KEY = CONFIG_CANDLES_HISTORY_SIZE_TITLE.replace(" ", "_")
+CONFIG_BUY_ORDER_AMOUNT = "buy_order_amount"
+CONFIG_SELL_ORDER_AMOUNT = "sell_order_amount"
 
 # Exchange
 DEFAULT_EXCHANGE_TIME_LAG = 10
@@ -47,6 +52,12 @@ DEFAULT_BACKTESTING_TIME_LAG = 0
 INFINITE_MAX_HANDLED_PAIRS_WITH_TIMEFRAME = -1
 DEFAULT_CANDLE_HISTORY_SIZE = 200
 DEFAULT_FAILED_REQUEST_RETRY_TIME = 1
+DEFAULT_REQUEST_TIMEOUT = int(os.getenv("DEFAULT_REQUEST_TIMEOUT", "20000"))    # default ccxt is 10s, use 20
+ENABLE_EXCHANGE_HTTP_PROXY_FROM_ENV = os_util.parse_boolean_environment_var(
+    "ENABLE_EXCHANGE_HTTP_PROXY_FROM_ENV", "True")
+ENABLE_CCXT_VERBOSE = os_util.parse_boolean_environment_var("ENABLE_CCXT_VERBOSE", "False")
+ENABLE_CCXT_RATE_LIMIT = os_util.parse_boolean_environment_var("ENABLE_CCXT_RATE_LIMIT", "True")
+THROTTLED_WS_UPDATES = float(os.getenv("THROTTLED_WS_UPDATES", "0.1"))  # avoid spamming CPU
 
 # Decimal default values (decimals are immutable, can be stored as constant)
 ZERO = decimal.Decimal(0)
@@ -57,10 +68,12 @@ NaN = decimal.Decimal("nan")
 FULL_CANDLE_HISTORY_EXCHANGES = ["bequant", "binance", "binanceus", "binanceusdm", "bitcoincom",
                                  "bitfinex", "bitfinex2", "bitmex", "idex", "bybit"]
 
-TESTED_EXCHANGES = ["binance", "ftx", "okx", "gateio", "huobi", "bitget",
+TESTED_EXCHANGES = ["binance", "okx", "gateio", "huobi", "bitget",
                     "ascendex", "kucoin", "coinbasepro", "bybit", "phemex", "hollaex"]
 DEFAULT_FUTURE_EXCHANGES = ["bybit"]
-SIMULATOR_TESTED_EXCHANGES = []
+SIMULATOR_TESTED_EXCHANGES = ["bitfinex2", "bithumb", "bitstamp", "bittrex", "coinex",
+                              "hitbtc", "kraken", "poloniex", "bitso", "ndax", "upbit",
+                              "wavesexchange"]
 
 CONFIG_DEFAULT_FEES = 0.001
 CONFIG_DEFAULT_SIMULATOR_FEES = 0
@@ -69,6 +82,7 @@ DEFAULT_SYMBOL_LEVERAGE = ONE
 DEFAULT_SYMBOL_MAX_LEVERAGE = ONE_HUNDRED
 DEFAULT_SYMBOL_MARGIN_TYPE = enums.MarginType.ISOLATED
 DEFAULT_SYMBOL_CONTRACT_TYPE = enums.FutureContractType.LINEAR_PERPETUAL
+DEFAULT_SYMBOL_CONTRACT_SIZE = ONE
 DEFAULT_SYMBOL_POSITION_MODE = enums.PositionMode.ONE_WAY
 DEFAULT_SYMBOL_FUNDING_RATE = decimal.Decimal("0.00005")
 DEFAULT_SYMBOL_MAINTENANCE_MARGIN_RATE = decimal.Decimal("0.01")
@@ -95,6 +109,7 @@ ORDERS_CHANNEL = "Orders"
 BALANCE_CHANNEL = "Balance"
 BALANCE_PROFITABILITY_CHANNEL = "BalanceProfitability"
 POSITIONS_CHANNEL = "Positions"
+INDIVIDUAL_ORDER_SYNC_TIMEOUT = 3 * commons_constants.MINUTE_TO_SECONDS
 
 # History
 DEFAULT_SAVED_HISTORICAL_TIMEFRAMES = [commons_enums.TimeFrames.ONE_DAY]
@@ -104,9 +119,6 @@ MINIMUM_VAL_TRADE_TIME = 946688400
 
 # Internal
 MODE_CHANNEL = "Mode"
-
-# CCXT library constants
-CCXT_INFO = "info"
 
 WEBSOCKET_FEEDS_TO_TRADING_CHANNELS = {
     TICKER_CHANNEL: [enums.WebsocketFeeds.TICKER],

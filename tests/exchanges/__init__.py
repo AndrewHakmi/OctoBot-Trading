@@ -30,12 +30,15 @@ from octobot_trading.api.exchange import create_exchange_builder, cancel_ccxt_th
 from octobot_trading.exchanges.exchange_manager import ExchangeManager
 from octobot_trading.exchanges.traders.trader_simulator import TraderSimulator
 import octobot_trading.personal_data as personal_data
+from octobot_trading.enums import FeePropertyColumns, ExchangeConstantsMarketPropertyColumns, \
+    ExchangeConstantsMarketPropertyColumns
 
 pytestmark = pytest.mark.asyncio
 
 TESTS_FOLDER = "tests"
 TESTS_STATIC_FOLDER = os.path.join(TESTS_FOLDER, "static")
-DEFAULT_EXCHANGE_NAME = "binance"
+DEFAULT_EXCHANGE_NAME = "binanceus"
+DEFAULT_FUTURE_EXCHANGE_NAME = "bybit"
 
 
 @pytest_asyncio.fixture
@@ -93,7 +96,7 @@ async def margin_simulated_exchange_manager():
 
 @pytest_asyncio.fixture
 async def future_exchange_manager():
-    exchange_manager_instance = ExchangeManager(load_test_config(), DEFAULT_EXCHANGE_NAME)
+    exchange_manager_instance = ExchangeManager(load_test_config(), DEFAULT_FUTURE_EXCHANGE_NAME)
     exchange_manager_instance.is_spot_only = False
     exchange_manager_instance.is_future = True
     await exchange_manager_instance.initialize()
@@ -106,7 +109,7 @@ async def future_exchange_manager():
 
 @pytest_asyncio.fixture
 async def future_simulated_exchange_manager():
-    exchange_manager_instance = ExchangeManager(load_test_config(), DEFAULT_EXCHANGE_NAME)
+    exchange_manager_instance = ExchangeManager(load_test_config(), DEFAULT_FUTURE_EXCHANGE_NAME)
     exchange_manager_instance.is_spot_only = False
     exchange_manager_instance.is_simulated = True
     exchange_manager_instance.is_future = True
@@ -209,6 +212,19 @@ def storage_mock():
         ),
         stop=mock.AsyncMock(),
     )
+
+
+def get_fees_mock(symbol, rate=0.1, cost=0.1):  # huge fees for tests
+    return {
+        FeePropertyColumns.RATE.value: rate,
+        FeePropertyColumns.COST.value: cost,
+        FeePropertyColumns.CURRENCY.value: symbol
+    }
+
+
+def set_future_exchange_fees(exchange, symbol, taker=0.0004, maker=0.0004):
+    exchange.client.markets[symbol]['taker'] = taker
+    exchange.client.markets[symbol]['maker'] = maker
 
 
 @pytest_asyncio.fixture

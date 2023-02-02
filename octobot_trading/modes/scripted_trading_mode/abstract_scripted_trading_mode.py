@@ -25,6 +25,7 @@ import octobot_trading.modes.abstract_trading_mode as abstract_trading_mode
 import octobot_trading.modes.channel as modes_channel
 import octobot_trading.modes.script_keywords.context_management as context_management
 import octobot_trading.modes.script_keywords.basic_keywords as basic_keywords
+import octobot_trading.modes.modes_util as modes_util
 import octobot_trading.errors as errors
 import octobot_tentacles_manager.api as tentacles_manager_api
 
@@ -63,20 +64,9 @@ class AbstractScriptedTradingMode(abstract_trading_mode.AbstractTradingMode):
         elif action == commons_enums.UserCommands.RELOAD_SCRIPT.value:
             await self.reload_scripts()
         elif action == commons_enums.UserCommands.CLEAR_PLOTTING_CACHE.value:
-            await self.clear_plotting_cache()
+            await modes_util.clear_plotting_cache(self)
         elif action == commons_enums.UserCommands.CLEAR_SIMULATED_ORDERS_CACHE.value:
-            await self.clear_simulated_orders_cache()
-
-    async def clear_simulated_orders_cache(self):
-        await basic_keywords.clear_orders_cache(
-            databases.RunDatabasesProvider.instance().get_orders_db(self.bot_id, self.exchange_manager.exchange_name)
-        )
-
-    async def clear_plotting_cache(self):
-        await basic_keywords.clear_symbol_plot_cache(
-            databases.RunDatabasesProvider.instance().get_symbol_db(self.bot_id, self.exchange_manager.exchange_name,
-                                                                    self.symbol)
-        )
+            await modes_util.clear_simulated_orders_cache(self)
 
     @classmethod
     async def get_backtesting_plot(cls, exchange, symbol, backtesting_id, optimizer_id,
@@ -117,7 +107,7 @@ class AbstractScriptedTradingMode(abstract_trading_mode.AbstractTradingMode):
                 await self.start_over_database()
 
     async def start_over_database(self):
-        await self.clear_plotting_cache()
+        await modes_util.clear_plotting_cache(self)
         symbol_db = databases.RunDatabasesProvider.instance().get_symbol_db(self.bot_id,
                                                                             self.exchange_manager.exchange_name,
                                                                             self.symbol)
@@ -264,8 +254,10 @@ class AbstractScriptedTradingModeProducer(modes_channel.AbstractTradingModeProdu
     async def call_script(self, matrix_id: str, cryptocurrency: str, symbol: str, time_frame: str,
                           trigger_source: str, trigger_cache_timestamp: float,
                           candle: dict = None, kline: dict = None, init_call: bool = False):
-        context = self.get_context(matrix_id, cryptocurrency, symbol, time_frame, trigger_source,
-                                   trigger_cache_timestamp, candle, kline, init_call)
+        context = context_management.get_full_context(
+            self.trading_mode, matrix_id, cryptocurrency, symbol, time_frame,
+            trigger_source, trigger_cache_timestamp, candle, kline, init_call=init_call
+        )
         self.last_call_by_timeframe[time_frame] = \
             (matrix_id, cryptocurrency, symbol, time_frame, trigger_source, trigger_cache_timestamp, candle, kline, init_call)
         context.matrix_id = matrix_id

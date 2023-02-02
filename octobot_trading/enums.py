@@ -160,37 +160,6 @@ class PositionMode(enum.Enum):
     ONE_WAY = "one_way_mode"
 
 
-class ExchangeConstantsCCXTColumns(enum.Enum):
-    TIMESTAMP = "timestamp"
-    DATETIME = "datetime"
-
-
-class ExchangePositionCCXTColumns(enum.Enum):
-    CONTRACTS = "contracts"
-    CONTRACT_SIZE = "contractSize"
-    MARGIN_TYPE = "marginType"
-    MARGIN_MODE = "marginMode"
-    LEVERAGE = "leverage"
-    SYMBOL = "symbol"
-    COLLATERAL = "collateral"
-    INITIAL_MARGIN = "initialMargin"
-    INITIAL_MARGIN_PERCENTAGE = "initialMarginPercentage"
-    MAINTENANCE_MARGIN = "maintenanceMargin"
-    MAINTENANCE_MARGIN_PERCENTAGE = "maintenanceMarginPercentage"
-    NOTIONAL = "notional"
-    MARGIN_RATIO = "marginRatio"
-    UNREALISED_PNL = "unrealizedPnl"
-    REALISED_PNL = "realizedPnl"
-    LIQUIDATION_PRICE = "liquidationPrice"
-    MARK_PRICE = "markPrice"
-    ENTRY_PRICE = "entryPrice"
-    TIMESTAMP = "timestamp"
-    DATETIME = "datetime"
-    PERCENTAGE = "percentage"
-    SIDE = "side"
-    INFO = "info"
-
-
 class ExchangeConstantsFundingColumns(enum.Enum):
     SYMBOL = "symbol"
     LAST_FUNDING_TIME = "last_funding_time"
@@ -341,9 +310,10 @@ class ExchangeConstantsOrderColumns(enum.Enum):
     MAKER = "maker"
     TAKER = "taker"
     ORDER = "order"
-    TAKERORMAKER = "takerOrMaker"
+    TAKER_OR_MAKER = "takerOrMaker"
     REDUCE_ONLY = "reduceOnly"
     STOP_PRICE = "stopPrice"
+    TRIGGER_ABOVE = "triggerAbove"
     TAG = "tag"
 
 
@@ -366,6 +336,7 @@ class ExchangeConstantsPositionColumns(enum.Enum):
     LEVERAGE = "leverage"
     MARGIN_TYPE = "margin_type"
     CONTRACT_TYPE = "contract_type"
+    CONTRACT_SIZE = "contract_size"
     POSITION_MODE = "position_mode"
     MAINTENANCE_MARGIN_RATE = "maintenance_margin_rate"
     STATUS = "status"
@@ -381,13 +352,6 @@ class ExchangeConstantsLiquidationColumns(enum.Enum):
     SIDE = "side"
 
 
-class ExchangeConstantsFeesColumns(enum.Enum):
-    TYPE = "type"
-    CURRENCY = "currency"
-    RATE = "rate"
-    COST = "cost"
-
-
 class ExchangeConstantsMarketPropertyColumns(enum.Enum):
     TAKER = "taker"  # trading
     MAKER = "maker"  # trading
@@ -399,6 +363,8 @@ class FeePropertyColumns(enum.Enum):
     CURRENCY = "currency"  # currency the fee is paid in
     RATE = "rate"  # multiplier applied to compute fee
     COST = "cost"  # fee amount
+    IS_FROM_EXCHANGE = "is_from_exchange"   # True when the fee value has been fetched from exchange
+    EXCHANGE_ORIGINAL_COST = "exchange_original_cost"  # fee amount as fetched from exchange
 
 
 class FeesCurrencySide(enum.Enum):
@@ -437,6 +403,9 @@ class WebsocketFeeds(enum.Enum):
     MARK_PRICE = 'mark_price'
     LAST_PRICE = 'last_price'
     ORDERS = 'orders'
+    LEDGER = 'ledger'
+    CREATE_ORDER = 'create_order'
+    CANCEL_ORDER = 'cancel_order'
     FUTURES_INDEX = 'futures_index'
     OPEN_INTEREST = 'open_interest'
     PORTFOLIO = 'portfolio'
@@ -473,11 +442,6 @@ class FutureContractType(enum.Enum):
 class SubAccountColumns(enum.Enum):
     ID = "id"
     NAME = "name"
-
-
-class ExchangeWrapperLibs(enum.Enum):
-    ASYNC_CCXT = "async_ccxt"
-    CCXT = "ccxt"
 
 
 class ExchangeTypes(enum.Enum):

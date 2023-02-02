@@ -143,7 +143,11 @@ class OrdersProducer(exchanges_channel.ExchangeChannelProducer):
         missing_order_ids = list(
             set(
                 order.order_id for order in
-                self.channel.exchange_manager.exchange_personal_data.orders_manager.get_open_orders(symbol)
+                self.channel.exchange_manager.exchange_personal_data.orders_manager.get_open_orders(
+                    symbol
+                ) + self.channel.exchange_manager.exchange_personal_data.orders_manager.get_pending_cancel_orders(
+                    symbol
+                )
                 if not order.is_self_managed()) -
             set(
                 self.channel.exchange_manager.exchange.parse_order_id(order)

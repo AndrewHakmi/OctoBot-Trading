@@ -46,12 +46,6 @@ from octobot_trading.exchanges.basic_exchange_wrapper cimport (
 from octobot_trading.exchanges.exchange_manager cimport (
     ExchangeManager,
 )
-from octobot_trading.exchanges.util.exchange_util cimport (
-    get_margin_exchange_class,
-    get_future_exchange_class,
-    get_spot_exchange_class,
-    get_order_side,
-)
 from octobot_trading.exchanges.util cimport (
     ExchangeMarketStatusFixer,
     is_ms_valid,
@@ -60,17 +54,13 @@ from octobot_trading.exchanges.util cimport (
     search_websocket_class,
 )
 from octobot_trading.exchanges.types cimport (
-    FutureExchange,
     WebSocketExchange,
-    MarginExchange,
-    SpotExchange,
+    RestExchange,
 )
 from octobot_trading.exchanges.util cimport (
     ExchangeMarketStatusFixer,
     is_ms_valid,
-    get_margin_exchange_class,
-    get_future_exchange_class,
-    get_spot_exchange_class,
+    get_rest_exchange_class,
     get_order_side,
     force_disable_web_socket,
     check_web_socket_config,
@@ -83,14 +73,9 @@ from octobot_trading.exchanges.util cimport (
 
 from octobot_trading.exchanges cimport implementations
 from octobot_trading.exchanges.implementations cimport (
-    SpotExchangeSimulator,
-    SpotCCXTExchange,
-    FutureExchangeSimulator,
-    FutureCCXTExchange,
-    MarginExchangeSimulator,
-    MarginCCXTExchange,
-    CCXTWebSocketExchange,
-    CryptofeedWebSocketExchange,
+    DefaultWebSocketExchange,
+    DefaultRestExchange,
+    ExchangeSimulator,
 )
 
 from octobot_trading.exchanges.exchange_builder cimport (
@@ -99,11 +84,9 @@ from octobot_trading.exchanges.exchange_builder cimport (
 
 from octobot_trading.exchanges cimport connectors
 from octobot_trading.exchanges.connectors cimport (
-    ExchangeSimulator,
-    CCXTExchange,
     CCXTWebsocketConnector,
-    AbstractWebsocketConnector,
-    CryptofeedWebsocketConnector,
+    CCXTConnector,
+    ExchangeSimulatorConnector,
 )
 
 from octobot_trading.exchanges cimport abstract_websocket_exchange
@@ -118,22 +101,18 @@ __all__ = [
     "ExchangeBuilder",
     "ExchangeConfiguration",
     "Exchanges",
-    "get_margin_exchange_class",
-    "get_future_exchange_class",
-    "get_spot_exchange_class",
+    "get_rest_exchange_class",
     "get_order_side",
     "AbstractExchange",
     "TraderSimulator",
     "Trader",
     "ExchangeSimulator",
-    "CCXTExchange",
-    "AbstractWebsocketConnector",
     "CCXTWebsocketConnector",
+    "CCXTConnector",
+    "ExchangeSimulatorConnector",
     "AbstractWebsocketExchange",
     "BasicExchangeWrapper",
-    "FutureExchange",
-    "MarginExchange",
-    "SpotExchange",
+    "RestExchange",
     "WebSocketExchange",
     "ExchangeMarketStatusFixer",
     "is_ms_valid",
@@ -145,13 +124,7 @@ __all__ = [
     "get_default_exchange_type",
     "get_supported_exchange_types",
     "get_exchange_class_from_name",
-    "SpotExchangeSimulator",
-    "SpotCCXTExchange",
-    "FutureExchangeSimulator",
-    "FutureCCXTExchange",
-    "MarginExchangeSimulator",
-    "MarginCCXTExchange",
-    "CCXTWebSocketExchange",
-    "CryptofeedWebSocketExchange",
-    "CryptofeedWebsocketConnector",
+    "DefaultWebSocketExchange",
+    "DefaultRestExchange",
+    "ExchangeSimulator",
 ]

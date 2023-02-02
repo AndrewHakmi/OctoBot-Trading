@@ -22,11 +22,11 @@ def is_exchange_managed_by_websocket(exchange_manager, channel):
     # TODO improve checker
     """
     return not exchange_manager.rest_only \
-           and exchange_manager.has_websocket \
-           and not exchange_manager.is_backtesting \
-           and channel in octobot_trading.constants.WEBSOCKET_FEEDS_TO_TRADING_CHANNELS \
-           and any([exchange_manager.exchange_web_socket.is_feed_available(feed)
-                    for feed in octobot_trading.constants.WEBSOCKET_FEEDS_TO_TRADING_CHANNELS[channel]])
+        and exchange_manager.has_websocket \
+        and not exchange_manager.is_backtesting \
+        and channel in octobot_trading.constants.WEBSOCKET_FEEDS_TO_TRADING_CHANNELS \
+        and any([exchange_manager.exchange_web_socket.is_feed_available(feed)
+                 for feed in octobot_trading.constants.WEBSOCKET_FEEDS_TO_TRADING_CHANNELS[channel]])
 
 
 def is_websocket_feed_requiring_init(exchange_manager, channel):
@@ -35,17 +35,16 @@ def is_websocket_feed_requiring_init(exchange_manager, channel):
 
 
 async def search_and_create_websocket(exchange_manager):
-    socket_manager = exchanges.search_websocket_class(exchanges.WebSocketExchange, exchange_manager)
-    if socket_manager is not None:
-        await _create_websocket(exchange_manager, exchanges.WebSocketExchange.__name__, socket_manager)
+    ws_exchange_class = exchanges.search_websocket_class(exchanges.WebSocketExchange, exchange_manager)
+    if ws_exchange_class is not None:
+        await _create_websocket(exchange_manager, exchanges.WebSocketExchange.__name__, ws_exchange_class)
 
 
-async def _create_websocket(exchange_manager, websocket_class_name, socket_manager):
+async def _create_websocket(exchange_manager, websocket_class_name, ws_exchange_class):
     try:
-        exchange_manager.exchange_web_socket = socket_manager.get_websocket_client(exchange_manager.config,
-                                                                                   exchange_manager)
+        exchange_manager.exchange_web_socket = ws_exchange_class(exchange_manager.config, exchange_manager)
         await _init_websocket(exchange_manager)
-        exchange_manager.logger.info(f"{socket_manager.get_name()} connected to "
+        exchange_manager.logger.info(f"{ws_exchange_class.get_name()} connected to "
                                      f"{exchange_manager.exchange.name.capitalize()}")
     except Exception as e:
         exchange_manager.logger.error(f"Fail to init websocket for {websocket_class_name} "

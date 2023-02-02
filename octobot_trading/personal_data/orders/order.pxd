@@ -103,7 +103,8 @@ cdef class Order(util.Initializable):
             object fees_currency_side=*,
             object group=*,
             str tag=*,
-            str quantity_currency=*)
+            str quantity_currency=*,
+            dict exchange_creation_params=*)
     cdef object _update_type_from_raw(self, dict raw_order)  # return object to allow exception raising
     cdef void _update_taker_maker(self)
     cdef object _on_origin_price_change(self, object previous_price, object price_time)
@@ -121,6 +122,7 @@ cdef class Order(util.Initializable):
     cpdef bint can_be_edited(self)
     cpdef object get_position_side(self, object future_contract)
     cpdef void on_fill_actions(self)
+    cpdef bint has_exchange_fetched_fees(self)
     cpdef dict get_computed_fee(self, object forced_value=*)
     cpdef object get_profitability(self)
     cpdef double generate_executed_time(self)

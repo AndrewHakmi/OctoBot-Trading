@@ -13,6 +13,10 @@
 #
 #  You should have received a copy of the GNU Lesser General Public
 #  License along with this library.
+from octobot_trading.exchanges import adapters
+from octobot_trading.exchanges.adapters import (
+    AbstractAdapter,
+)
 from octobot_trading.exchanges import exchanges
 from octobot_trading.exchanges.exchanges import (
     ExchangeConfiguration,
@@ -58,9 +62,7 @@ from octobot_trading.exchanges.exchange_factory import (
 from octobot_trading.exchanges.util import (
     ExchangeMarketStatusFixer,
     is_ms_valid,
-    get_margin_exchange_class,
-    get_future_exchange_class,
-    get_spot_exchange_class,
+    get_rest_exchange_class,
     get_order_side,
     log_time_sync_error,
     get_partners_explanation_message,
@@ -93,22 +95,14 @@ from octobot_trading.exchanges.traders import (
 )
 from octobot_trading.exchanges import types
 from octobot_trading.exchanges.types import (
-    FutureExchange,
     WebSocketExchange,
-    MarginExchange,
-    SpotExchange,
+    RestExchange,
 )
 from octobot_trading.exchanges import implementations
 from octobot_trading.exchanges.implementations import (
-    CCXTWebSocketExchange,
-    DefaultCCXTSpotExchange,
-    SpotExchangeSimulator,
-    SpotCCXTExchange,
-    FutureExchangeSimulator,
-    FutureCCXTExchange,
-    MarginExchangeSimulator,
-    MarginCCXTExchange,
-    CryptofeedWebSocketExchange,
+    DefaultWebSocketExchange,
+    ExchangeSimulator,
+    DefaultRestExchange,
 )
 from octobot_trading.exchanges import exchange_builder
 from octobot_trading.exchanges.exchange_builder import (
@@ -117,14 +111,15 @@ from octobot_trading.exchanges.exchange_builder import (
 )
 from octobot_trading.exchanges import connectors
 from octobot_trading.exchanges.connectors import (
-    ExchangeSimulator,
-    CCXTExchange,
     CCXTWebsocketConnector,
-    AbstractWebsocketConnector,
-    CryptofeedWebsocketConnector,
+    CCXTConnector,
+    CCXTAdapter,
+    ExchangeSimulatorConnector,
+    ExchangeSimulatorAdapter,
 )
 
 __all__ = [
+    "AbstractAdapter",
     "ExchangeConfig",
     "BacktestingExchangeConfig",
     "ExchangeManager",
@@ -137,9 +132,7 @@ __all__ = [
     "init_simulated_exchange",
     "ExchangeConfiguration",
     "Exchanges",
-    "get_margin_exchange_class",
-    "get_future_exchange_class",
-    "get_spot_exchange_class",
+    "get_rest_exchange_class",
     "get_order_side",
     "log_time_sync_error",
     "get_partners_explanation_message",
@@ -159,31 +152,23 @@ __all__ = [
     "create_authenticated_producer_from_parent",
     "TraderSimulator",
     "Trader",
-    "CCXTWebSocketExchange",
-    "DefaultCCXTSpotExchange",
-    "CryptofeedWebSocketExchange",
-    "SpotExchangeSimulator",
-    "SpotCCXTExchange",
-    "FutureExchangeSimulator",
-    "FutureCCXTExchange",
-    "MarginExchangeSimulator",
-    "MarginCCXTExchange",
+    "DefaultWebSocketExchange",
+    "DefaultRestExchange",
     "ExchangeSimulator",
-    "CCXTExchange",
-    "AbstractWebsocketConnector",
     "CCXTWebsocketConnector",
-    "FutureExchange",
-    "MarginExchange",
-    "SpotExchange",
     "WebSocketExchange",
+    "RestExchange",
     "ExchangeMarketStatusFixer",
     "is_ms_valid",
     "AbstractWebsocketExchange",
     "BasicExchangeWrapper",
     "temporary_exchange_wrapper",
-    "CryptofeedWebsocketConnector",
     "force_disable_web_socket",
     "check_web_socket_config",
     "search_websocket_class",
     "supports_websocket",
+    "CCXTConnector",
+    "CCXTAdapter",
+    "ExchangeSimulatorConnector",
+    "ExchangeSimulatorAdapter",
 ]

@@ -24,7 +24,7 @@ import octobot_trading.enums as enums
 import octobot_trading.errors as errors
 
 from tests import event_loop
-from tests.exchanges import future_simulated_exchange_manager
+from tests.exchanges import future_simulated_exchange_manager, set_future_exchange_fees
 from tests.personal_data import check_created_transaction, get_latest_transaction
 from tests.exchanges.traders import future_trader_simulator_with_default_linear, \
     future_trader_simulator_with_default_inverse, DEFAULT_FUTURE_SYMBOL, DEFAULT_FUTURE_FUNDING_RATE
@@ -420,6 +420,7 @@ async def test_get_bankruptcy_price_with_short(future_trader_simulator_with_defa
 
 async def test_get_order_cost(future_trader_simulator_with_default_linear):
     config, exchange_manager_inst, trader_inst, default_contract = future_trader_simulator_with_default_linear
+    set_future_exchange_fees(exchange_manager_inst.exchange.connector, default_contract.pair)
     position_inst = personal_data.LinearPosition(trader_inst, default_contract)
     position_inst.update_from_raw({enums.ExchangeConstantsPositionColumns.SYMBOL.value: DEFAULT_FUTURE_SYMBOL})
 
@@ -431,6 +432,7 @@ async def test_get_order_cost(future_trader_simulator_with_default_linear):
 
 async def test_get_fee_to_open(future_trader_simulator_with_default_linear):
     config, exchange_manager_inst, trader_inst, default_contract = future_trader_simulator_with_default_linear
+    set_future_exchange_fees(exchange_manager_inst.exchange.connector, default_contract.pair)
     position_inst = personal_data.LinearPosition(trader_inst, default_contract)
     position_inst.update_from_raw({enums.ExchangeConstantsPositionColumns.SYMBOL.value: DEFAULT_FUTURE_SYMBOL})
 
@@ -446,6 +448,7 @@ async def test_get_fee_to_open(future_trader_simulator_with_default_linear):
 
 async def test_update_fee_to_close(future_trader_simulator_with_default_linear):
     config, exchange_manager_inst, trader_inst, default_contract = future_trader_simulator_with_default_linear
+    set_future_exchange_fees(exchange_manager_inst.exchange.connector, default_contract.pair)
     position_inst = personal_data.LinearPosition(trader_inst, default_contract)
     position_inst.update_from_raw({enums.ExchangeConstantsPositionColumns.SYMBOL.value: DEFAULT_FUTURE_SYMBOL})
 
@@ -459,6 +462,7 @@ async def test_update_fee_to_close(future_trader_simulator_with_default_linear):
 
 def test_get_two_way_taker_fee_for_quantity_and_price(future_trader_simulator_with_default_linear):
     config, exchange_manager_inst, trader_inst, default_contract = future_trader_simulator_with_default_linear
+    set_future_exchange_fees(exchange_manager_inst.exchange.connector, default_contract.pair)
 
     # no need to initialize the position
     leverage = decimal.Decimal("2")

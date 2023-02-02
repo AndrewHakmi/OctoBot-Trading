@@ -25,22 +25,12 @@ import octobot_tentacles_manager.api as api
 import octobot_trading.enums as enums
 import octobot_trading.constants as constants
 import octobot_trading.exchanges.types as exchanges_types
+import octobot_trading.exchanges.implementations as exchanges_implementations
 import octobot_trading.exchanges.exchange_builder as exchange_builder
 
 
-def get_margin_exchange_class(exchange_name, tentacles_setup_config):
-    return search_exchange_class_from_exchange_name(exchanges_types.MarginExchange, exchange_name,
-                                                    tentacles_setup_config)
-
-
-def get_future_exchange_class(exchange_name, tentacles_setup_config):
-    return search_exchange_class_from_exchange_name(exchanges_types.FutureExchange, exchange_name,
-                                                    tentacles_setup_config)
-
-
-def get_spot_exchange_class(exchange_name, tentacles_setup_config):
-    return search_exchange_class_from_exchange_name(exchanges_types.SpotExchange, exchange_name,
-                                                    tentacles_setup_config)
+def get_rest_exchange_class(exchange_name, tentacles_setup_config):
+    return search_exchange_class_from_exchange_name(exchanges_types.RestExchange, exchange_name, tentacles_setup_config)
 
 
 def search_exchange_class_from_exchange_name(exchange_class, exchange_name,
@@ -53,9 +43,12 @@ def search_exchange_class_from_exchange_name(exchange_class, exchange_name,
 
     logging.get_logger("ExchangeUtil").debug(f"No specific exchange implementation for {exchange_name} found, "
                                              f"using a default one.")
-    # TODO: handle default future exchange instead of creating a SpotExchange
-    return search_exchange_class_from_exchange_name(exchanges_types.SpotExchange, exchange_name,
-                                                    tentacles_setup_config, enable_default=True)
+    children_classes = tentacles_management.get_all_classes_from_parent(exchanges_implementations.DefaultRestExchange)
+    if children_classes:
+        # last one is the most advanced one
+        return children_classes[-1]
+    # fallback to DefaultRestExchange
+    return exchanges_implementations.DefaultRestExchange
 
 
 def get_exchange_class_from_name(exchange_parent_class, exchange_name, tentacles_setup_config, enable_default,
@@ -144,7 +137,7 @@ async def is_compatible_account(exchange_name: str, exchange_config: dict, tenta
     Returns details regarding the compatibility of the account given in parameters
     :return: (True if compatible, True if successful login, error explanation if any)
     """
-    exchange_type = exchange_config.get(common_constants.CONFIG_EXCHANGE_TYPE, common_constants.DEFAULT_EXCHANGE_TYPE)
+    exchange_type = exchange_config.get(common_constants.CONFIG_EXCHANGE_TYPE, get_default_exchange_type(exchange_name))
     builder = exchange_builder.ExchangeBuilder(
         _get_minimal_exchange_config(exchange_name, exchange_config),
         exchange_name
@@ -173,8 +166,8 @@ async def is_compatible_account(exchange_name: str, exchange_config: dict, tenta
         return False, False, _get_time_sync_error_message(exchange_name, "account details")
     except trading_backend.ExchangeAuthError:
         return False, False, f"Invalid {exchange_name.capitalize()} authentication details"
-    except Exception as e:
-        return False, True, f"Error when loading exchange account: {e}"
+    except (AttributeError, Exception) as e:
+        return True, False, f"Error when loading exchange account: {e}"
     finally:
         # do not log stopping message
         logger = local_exchange_manager.exchange.connector.logger
@@ -188,18 +181,18 @@ async def get_historical_ohlcv(local_exchange_manager, symbol, time_frame, start
     Async generator, use as follows:
         async for candles in get_historical_ohlcv(exchange_manager, pair, time_frame, start_time, end_time):
             # candles stuff
+    WARNING: start_time and end_time should be milliseconds timestamps
     """
     reached_max = False
     while start_time < end_time and not reached_max:
         candles = await local_exchange_manager.exchange.get_symbol_prices(symbol, time_frame, since=int(start_time))
         if candles:
-            start_time = candles[-1][common_enums.PriceIndexes.IND_PRICE_TIME.value]
-            while start_time > end_time and candles:
-                start_time = candles.pop(-1)[common_enums.PriceIndexes.IND_PRICE_TIME.value]
+            while candles and candles[-1][common_enums.PriceIndexes.IND_PRICE_TIME.value] * 1000 > end_time:
+                candles.pop(-1)
                 reached_max = True
             if candles:
-                local_exchange_manager.exchange.uniformize_candles_if_necessary(candles)
                 yield candles
+                start_time = candles[-1][common_enums.PriceIndexes.IND_PRICE_TIME.value] * 1000
                 # avoid fetching the last element twice
                 start_time += 1
             else:
@@ -225,15 +218,9 @@ def get_default_exchange_type(exchange_name):
 
 
 def get_supported_exchange_types(exchange_name):
-    supported_exchanges = [enums.ExchangeTypes.SPOT]
-    # TODO remove this after rest exchange refactor
-    if exchange_name.lower() == "bybit":
-        supported_exchanges = []
-    # end TODO
-    if get_exchange_class_from_name(exchanges_types.FutureExchange, exchange_name, None, False,
-                                    strict_name_matching=True) is not None:
-        supported_exchanges.append(enums.ExchangeTypes.FUTURE)
-    if get_exchange_class_from_name(exchanges_types.MarginExchange, exchange_name, None, False,
-                                    strict_name_matching=True) is not None:
-        supported_exchanges.append(enums.ExchangeTypes.MARGIN)
-    return supported_exchanges
+    exchange_class = get_exchange_class_from_name(exchanges_types.RestExchange, exchange_name, None, False,
+                                                  strict_name_matching=True)
+    if exchange_class is None:
+        # default
+        return [enums.ExchangeTypes.SPOT]
+    return exchange_class.get_supported_exchange_types()

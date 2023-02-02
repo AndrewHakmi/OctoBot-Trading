@@ -77,6 +77,9 @@ class TestBittrexRealExchangeTester(RealExchangeTester):
         # check last candle is the current candle
         assert symbol_prices[-1][PriceIndexes.IND_PRICE_TIME.value] >= self.get_time() - self.get_allowed_time_delta()
 
+        # try with since and limit (used in data collector)
+        assert await self.get_symbol_prices(since=self.CANDLE_SINCE, limit=50) == []    # not supported
+
     async def test_get_kline_price(self):
         # kline_price = await self.get_kline_price()
         client = bittrex()
@@ -138,7 +141,7 @@ class TestBittrexRealExchangeTester(RealExchangeTester):
             assert ticker[Ectc.OPEN.value] is None
             assert ticker[Ectc.CLOSE.value]
             assert ticker[Ectc.LAST.value]
-            assert ticker[Ectc.TIMESTAMP.value] is None  # will trigger an 'Ignored incomplete ticker'
+            assert ticker[Ectc.TIMESTAMP.value]
             assert ticker[Ectc.PREVIOUS_CLOSE.value] is None
             assert ticker[Ectc.BASE_VOLUME.value] is None
             RealExchangeTester.check_ticker_typing(ticker, check_open=False, check_high=False,

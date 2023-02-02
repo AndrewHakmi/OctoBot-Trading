@@ -15,6 +15,7 @@
 #  License along with this library
 import octobot_commons.channels_name as channels_name
 import octobot_commons.enums as commons_enums
+import octobot_commons.authentication as authentication
 import octobot_commons.databases as commons_databases
 
 import octobot_trading.enums as enums
@@ -46,6 +47,17 @@ class TradesStorage(abstract_storage.AbstractStorage):
                     self.plot_settings.mode
                 )
             )
+            await self.trigger_debounced_update_auth_data()
+
+    async def _update_auth_data(self):
+        authenticator = authentication.Authenticator.instance()
+        history = [
+            trade
+            for trade in self.exchange_manager.exchange_personal_data.trades_manager.trades.values()
+            if trade.status is not enums.OrderStatus.CANCELED
+        ]
+        if history and authenticator.is_initialized():
+            await authenticator.update_trades(history)
 
     async def _store_history(self):
         await self._get_db().log_many(
@@ -116,7 +128,9 @@ def _format_trade(trade_dict, exchange_manager, chart, x_multiplier, kind, mode)
         else:
             color = "magenta"
             shape = "arrow-bar-left"
-
+    fee = trade_dict[enums.ExchangeConstantsOrderColumns.FEE.value]
+    fee_cost = float(fee[enums.FeePropertyColumns.COST.value] if
+                     fee and fee[enums.FeePropertyColumns.COST.value] else 0)
     return {
         "x": trade_dict[enums.ExchangeConstantsOrderColumns.TIMESTAMP.value] * x_multiplier,
         "text": f"{tag}{trade_dict[enums.ExchangeConstantsOrderColumns.TYPE.value]} "
@@ -139,10 +153,7 @@ def _format_trade(trade_dict, exchange_manager, chart, x_multiplier, kind, mode)
         "shape": shape,
         "color": color,
         "size": "10",
-        "fees_amount": float(trade_dict[enums.ExchangeConstantsOrderColumns.FEE.value]
-                             [enums.ExchangeConstantsFeesColumns.COST.value] if
-                             trade_dict[enums.ExchangeConstantsOrderColumns.FEE.value] else 0),
-        "fees_currency": trade_dict[enums.ExchangeConstantsOrderColumns.FEE.value][
-            enums.ExchangeConstantsFeesColumns.CURRENCY.value]
+        "fees_amount": fee_cost,
+        "fees_currency": fee[enums.FeePropertyColumns.CURRENCY.value]
         if trade_dict[enums.ExchangeConstantsOrderColumns.FEE.value] else "",
     }

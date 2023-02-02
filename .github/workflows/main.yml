@@ -20,6 +20,7 @@ jobs:
       use_cython: true
     secrets:
       COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
+      http_proxy: ${{ secrets.EXCHANGE_HTTP_PROXY }}
 
   publish:
     needs: tests

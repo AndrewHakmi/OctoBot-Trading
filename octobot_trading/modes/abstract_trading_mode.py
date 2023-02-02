@@ -20,7 +20,6 @@ import decimal
 import octobot_commons.constants as common_constants
 import octobot_commons.enums as common_enums
 import octobot_commons.logging as logging
-import octobot_commons.configuration as commons_configuration
 import octobot_commons.tentacles_management as abstract_tentacle
 
 import async_channel.constants as channel_constants
@@ -35,6 +34,8 @@ import octobot_trading.exchange_channel as exchanges_channel
 import octobot_trading.modes.modes_factory as modes_factory
 import octobot_trading.modes.channel.abstract_mode_producer as abstract_mode_producer
 import octobot_trading.modes.channel.abstract_mode_consumer as abstract_mode_consumer
+import octobot_trading.modes.mode_config as mode_config
+import octobot_trading.modes.modes_util as modes_util
 import octobot_trading.signals as signals
 
 
@@ -129,34 +130,11 @@ class AbstractTradingMode(abstract_tentacle.AbstractTentacle):
     def get_mode_consumer_classes(self) -> list:
         return self.MODE_CONSUMER_CLASSES
 
-    def should_emit_trading_signals_user_input(self, inputs: dict):
-        if self.UI.user_input(
-            common_constants.CONFIG_EMIT_TRADING_SIGNALS, common_enums.UserInputTypes.BOOLEAN, False, inputs,
-            title="Emit trading signals on Astrolab for people to follow.",
-            order=commons_configuration.UserInput.MAX_ORDER - 2
-        ):
-            self.UI.user_input(
-                common_constants.CONFIG_TRADING_SIGNALS_STRATEGY, common_enums.UserInputTypes.TEXT, self.get_name(),
-                inputs,
-                title="Name of the strategy to send signals on.",
-                order=commons_configuration.UserInput.MAX_ORDER - 1,
-                other_schema_values={"minLength": 0}
-            )
-
-    def is_trading_signal_emitter(self) -> bool:
-        """
-        :return: True if the mode should be emitting trading signals according to configuration
-        """
-        try:
-            return self.trading_config[common_constants.CONFIG_EMIT_TRADING_SIGNALS]
-        except KeyError:
-            return False
-
     def should_emit_trading_signal(self) -> bool:
         """
         :return: True if the mode should be emitting trading signals according to configuration and trading environment
         """
-        return not self.exchange_manager.is_backtesting and self.is_trading_signal_emitter()
+        return not self.exchange_manager.is_backtesting and mode_config.is_trading_signal_emitter(self)
 
     def get_trading_signal_identifier(self) -> str:
         """
@@ -166,6 +144,12 @@ class AbstractTradingMode(abstract_tentacle.AbstractTentacle):
             return self.trading_config[common_constants.CONFIG_TRADING_SIGNALS_STRATEGY] or self.get_name()
         except KeyError:
             return self.get_name()
+
+    def is_following_trading_signals(self) -> bool:
+        """
+        :return: True when the trading mode is following trading signals
+        """
+        return False
 
     @classmethod
     def get_is_trading_on_exchange(cls, exchange_name,
@@ -266,6 +250,10 @@ class AbstractTradingMode(abstract_tentacle.AbstractTentacle):
         if action == common_enums.UserCommands.RELOAD_CONFIG.value:
             await self.reload_config(bot_id)
             self.logger.debug("Reloaded configuration")
+        elif action == common_enums.UserCommands.CLEAR_PLOTTING_CACHE.value:
+            await modes_util.clear_plotting_cache(self)
+        elif action == common_enums.UserCommands.CLEAR_SIMULATED_ORDERS_CACHE.value:
+            await modes_util.clear_simulated_orders_cache(self)
 
 
     async def _create_mode_consumer(self, mode_consumer_class):
@@ -299,6 +287,7 @@ class AbstractTradingMode(abstract_tentacle.AbstractTentacle):
                                     abstract_mode_producer.AbstractTradingModeProducer)):
                 element.on_reload_config()
                 await element.init_user_inputs(False)
+        self.logger.debug(f"Using config: {self.trading_config}")
 
     def get_local_config(self):
         return self.trading_config
@@ -357,10 +346,13 @@ class AbstractTradingMode(abstract_tentacle.AbstractTentacle):
              as signal_builder:
             yield signal_builder
 
-    async def create_order(self, order, loaded: bool = False, params: dict = None, pre_init_callback=None):
+    async def create_order(self, order, loaded: bool = False, params: dict = None,
+                           wait_for_creation=True,
+                           creation_timeout=constants.INDIVIDUAL_ORDER_SYNC_TIMEOUT):
         return await signals.create_order(
             self.exchange_manager, self.should_emit_trading_signal(), order,
-            loaded=loaded, params=params, pre_init_callback=pre_init_callback
+            loaded=loaded, params=params,
+            wait_for_creation=wait_for_creation, creation_timeout=creation_timeout
         )
 
     async def cancel_order(self, order, ignored_order: object = None) -> bool:
@@ -400,4 +392,3 @@ class AbstractTradingMode(abstract_tentacle.AbstractTentacle):
             for consumer in self.consumers
             if isinstance(consumer, abstract_mode_consumer.AbstractTradingModeConsumer)
         ]
-

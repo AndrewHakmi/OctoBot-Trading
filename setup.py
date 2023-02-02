@@ -18,7 +18,7 @@ import os
 
 from setuptools import dist
 
-dist.Distribution().fetch_build_eggs(['Cython>=0.29.26', 'numpy==1.22.0'])
+dist.Distribution().fetch_build_eggs(['Cython>=0.29.32', 'numpy==1.24.0'])
 
 import numpy as np
 
@@ -77,6 +77,7 @@ packages_list = [
     "octobot_trading.exchange_data.prices.channel.prices_updater_simulator",
     "octobot_trading.exchange_data.prices.channel.prices_updater",
     "octobot_trading.exchange_data.ohlcv.candles_manager",
+    "octobot_trading.exchange_data.ohlcv.preloaded_candles_manager",
     "octobot_trading.exchange_data.ohlcv.candles_adapter",
     "octobot_trading.exchange_data.ohlcv.channel.ohlcv_updater",
     "octobot_trading.exchange_data.ohlcv.channel.ohlcv_updater_simulator",
@@ -98,6 +99,8 @@ packages_list = [
     "octobot_trading.personal_data.orders.order_factory",
     "octobot_trading.personal_data.orders.groups.balanced_take_profit_and_stop_order_group",
     "octobot_trading.personal_data.orders.groups.one_cancels_the_other_order_group",
+    "octobot_trading.personal_data.orders.states.pending_creation_order_state",
+    "octobot_trading.personal_data.orders.states.pending_creation_chained_order_state",
     "octobot_trading.personal_data.orders.states.fill_order_state",
     "octobot_trading.personal_data.orders.states.cancel_order_state",
     "octobot_trading.personal_data.orders.states.close_order_state",
@@ -175,29 +178,20 @@ packages_list = [
     "octobot_trading.exchanges.exchange_builder",
     "octobot_trading.exchanges.exchange_channels",
     "octobot_trading.exchanges.exchange_factory",
-    "octobot_trading.exchanges.connectors.ccxt_exchange",
-    "octobot_trading.exchanges.connectors.exchange_simulator",
-    "octobot_trading.exchanges.connectors.abstract_websocket_connector",
-    "octobot_trading.exchanges.connectors.ccxt_websocket_connector",
-    "octobot_trading.exchanges.connectors.cryptofeed_websocket_connector",
+    "octobot_trading.exchanges.connectors.ccxt.ccxt_client_util",
+    "octobot_trading.exchanges.connectors.ccxt.ccxt_connector",
+    "octobot_trading.exchanges.connectors.ccxt.ccxt_websocket_connector",
+    "octobot_trading.exchanges.connectors.simulator.exchange_simulator_connector",
     "octobot_trading.exchanges.traders.trader",
     "octobot_trading.exchanges.traders.trader_simulator",
     "octobot_trading.exchanges.util.exchange_market_status_fixer",
     "octobot_trading.exchanges.util.websockets_util",
     "octobot_trading.exchanges.util.exchange_util",
-    "octobot_trading.exchanges.types.spot_exchange",
-    "octobot_trading.exchanges.types.margin_exchange",
-    "octobot_trading.exchanges.types.future_exchange",
+    "octobot_trading.exchanges.types.rest_exchange",
     "octobot_trading.exchanges.types.websocket_exchange",
-    "octobot_trading.exchanges.implementations.future_ccxt_exchange",
-    "octobot_trading.exchanges.implementations.future_exchange_simulator",
-    "octobot_trading.exchanges.implementations.margin_ccxt_exchange",
-    "octobot_trading.exchanges.implementations.margin_exchange_simulator",
-    "octobot_trading.exchanges.implementations.spot_ccxt_exchange",
-    "octobot_trading.exchanges.implementations.spot_exchange_simulator",
-    "octobot_trading.exchanges.implementations.ccxt_websocket_exchange",
-    "octobot_trading.exchanges.implementations.cryptofeed_websocket_exchange",
-    # "octobot_trading.exchanges.implementations.default_spot_ccxt_exchange",
+    "octobot_trading.exchanges.implementations.default_websocket_exchange",
+    "octobot_trading.exchanges.implementations.default_rest_exchange",
+    "octobot_trading.exchanges.implementations.exchange_simulator",
     "octobot_trading.exchange_channel",
 ]
 

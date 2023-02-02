@@ -28,8 +28,7 @@ class OrderState(state_class.State):
         super().__init__(is_from_exchange_data)
 
         # ensure order has not been cleared
-        if order.is_cleared():
-            raise octobot_trading.errors.InvalidOrderState(f"Order has already been cleared. Order: {order}")
+        self.ensure_not_cleared(order)
 
         # related order
         self.order = order
@@ -74,7 +73,9 @@ class OrderState(state_class.State):
         elif state_message is enums.StatesMessages.SYNCHRONIZING_ERROR:
             self.get_logger().exception(error, True, f"Error when synchronizing order {self.order}: {error}")
         else:
-            self.get_logger().info(f"{self.order} {state_message.value} on {self.order.exchange_manager.exchange_name}")
+            exchange_name = self.order.exchange_manager.exchange_name if self.order.exchange_manager \
+                else 'unknown exchange'
+            self.get_logger().info(f"{self.order} {state_message.value} on {exchange_name}")
 
     async def should_be_updated(self) -> bool:
         """
@@ -82,6 +83,12 @@ class OrderState(state_class.State):
         :return: True when the order type is supported by the exchange
         """
         return self.order.is_self_managed()
+
+    def allows_new_status(self, status) -> bool:
+        """
+        :return: True if the given status is compatible with the current state
+        """
+        return True
 
     async def replace_order(self, new_order):
         async with self.refresh_operation():
@@ -95,11 +102,23 @@ class OrderState(state_class.State):
         :param force_synchronization: When True, for the update of the order from the exchange
         :return: the result of OrdersProducer.update_order_from_exchange()
         """
-        return (await exchange_channel.get_chan(octobot_trading.constants.ORDERS_CHANNEL,
-                                                self.order.exchange_manager.id).get_internal_producer().
-                update_order_from_exchange(order=self.order,
-                                           wait_for_refresh=True,
-                                           force_job_execution=force_synchronization))
+        try:
+            self.ensure_not_cleared(self.order)
+            await exchange_channel.get_chan(
+                octobot_trading.constants.ORDERS_CHANNEL,
+                self.order.exchange_manager.id
+            ).get_internal_producer().update_order_from_exchange(
+                order=self.order,
+                wait_for_refresh=True,
+                force_job_execution=force_synchronization,
+            )
+        except octobot_trading.errors.InvalidOrderState:
+            self.get_logger().debug(f"Skipping exchange synchronisation as order has already been closed.")
+
+    @staticmethod
+    def ensure_not_cleared(order):
+        if order.is_cleared():
+            raise octobot_trading.errors.InvalidOrderState(f"Order has already been cleared. Order: {order}")
 
     def clear(self):
         """

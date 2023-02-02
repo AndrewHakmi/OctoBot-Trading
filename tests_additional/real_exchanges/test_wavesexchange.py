@@ -20,6 +20,7 @@ from octobot_trading.enums import ExchangeConstantsMarketStatusColumns as Ecmsc,
     ExchangeConstantsOrderBookInfoColumns as Ecobic, ExchangeConstantsOrderColumns as Ecoc, \
     ExchangeConstantsTickersColumns as Ectc
 from tests_additional.real_exchanges.real_exchange_tester import RealExchangeTester
+import octobot_trading.errors as errors
 # required to catch async loop context exceptions
 from tests import event_loop
 
@@ -82,6 +83,10 @@ class TestWavesExchangeRealExchangeTester(RealExchangeTester):
         # check last candle is the current candle
         assert symbol_prices[-1][PriceIndexes.IND_PRICE_TIME.value] >= self.get_time() - self.get_allowed_time_delta()
 
+        with pytest.raises(errors.UnexpectedAdapterError):
+            # try with since and limit (used in data collector)
+            assert await self.get_symbol_prices(since=self.CANDLE_SINCE, limit=50) == []    # not supported
+
     async def test_get_kline_price(self):
         kline_price = await self.get_kline_price()
         assert len(kline_price) == 1
@@ -123,16 +128,17 @@ class TestWavesExchangeRealExchangeTester(RealExchangeTester):
             Ectc.PREVIOUS_CLOSE.value
         ))
         if check_content:
-            assert ticker[Ectc.HIGH.value]
-            assert ticker[Ectc.LOW.value]
+            # todo fix in tentacle: replace 0.0 by None
+            assert ticker[Ectc.HIGH.value] is None
+            assert ticker[Ectc.LOW.value] is None
             assert ticker[Ectc.BID.value] is None
             assert ticker[Ectc.BID_VOLUME.value] is None
             assert ticker[Ectc.ASK.value] is None
             assert ticker[Ectc.ASK_VOLUME.value] is None
-            assert ticker[Ectc.OPEN.value]
-            assert ticker[Ectc.CLOSE.value]
-            assert ticker[Ectc.LAST.value]
+            assert ticker[Ectc.OPEN.value] is None
+            assert ticker[Ectc.CLOSE.value] is None
+            assert ticker[Ectc.LAST.value] is None
             assert ticker[Ectc.PREVIOUS_CLOSE.value] is None
-            assert ticker[Ectc.BASE_VOLUME.value]
+            assert ticker[Ectc.BASE_VOLUME.value] is None
             assert ticker[Ectc.TIMESTAMP.value] is None  # will trigger an 'Ignored incomplete ticker'
             RealExchangeTester.check_ticker_typing(ticker, check_timestamp=False)

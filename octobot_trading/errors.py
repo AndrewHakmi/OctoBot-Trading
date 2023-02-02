@@ -45,9 +45,15 @@ class OrderEditError(Exception):
     """
 
 
+class OrderCancelError(Exception):
+    """
+    Raised upon a failed order cancel
+    """
+
+
 class NotSupported(Exception):
     """
-    Raised when an exchange doesn't support the endpoint
+    Raised when an exchange doesn't support the required element
     """
 
 
@@ -179,4 +185,16 @@ class InvalidArgumentError(Exception):
 class OrderDescriptionNotFoundError(Exception):
     """
     Raised when an order description is not found
+    """
+
+
+class AdapterError(Exception):
+    """
+    Raised when an error occurs in an adapter
+    """
+
+
+class UnexpectedAdapterError(Exception):
+    """
+    Raised when an unexpected error occurs in an adapter
     """

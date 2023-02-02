@@ -34,12 +34,20 @@ from octobot_trading.modes.script_keywords.basic_keywords import (
     emit_trading_signals,
     set_leverage,
     set_partial_take_profit_stop_loss,
+    get_amount_from_input_amount,
+    total_account_balance,
+    available_account_balance,
+    adapt_amount_to_holdings,
+    account_holdings,
+    get_order_size_portfolio_percent,
     set_plot_orders,
     store_orders,
 )
 
 from octobot_trading.modes.script_keywords import context_management
 from octobot_trading.modes.script_keywords.context_management import (
+    get_base_context,
+    get_full_context,
     Context,
 )
 
@@ -59,7 +67,15 @@ __all__ = [
     "emit_trading_signals",
     "set_leverage",
     "set_partial_take_profit_stop_loss",
+    "get_amount_from_input_amount",
+    "total_account_balance",
+    "available_account_balance",
+    "adapt_amount_to_holdings",
+    "account_holdings",
+    "get_order_size_portfolio_percent",
     "set_plot_orders",
     "store_orders",
+    "get_base_context",
+    "get_full_context",
     "Context",
 ]

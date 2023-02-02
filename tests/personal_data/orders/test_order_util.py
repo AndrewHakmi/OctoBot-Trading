@@ -15,7 +15,7 @@
 #  License along with this library.
 import decimal
 
-import mock
+from mock import Mock, AsyncMock
 import pytest
 
 import octobot_trading.api as api
@@ -24,7 +24,7 @@ import octobot_trading.constants as constants
 import octobot_trading.personal_data as personal_data
 
 from tests import event_loop
-from tests.exchanges import future_simulated_exchange_manager, simulated_exchange_manager
+from tests.exchanges import future_simulated_exchange_manager, simulated_exchange_manager, set_future_exchange_fees
 from tests.exchanges.traders import future_trader_simulator_with_default_linear, \
     future_trader_simulator_with_default_inverse, DEFAULT_FUTURE_SYMBOL, DEFAULT_FUTURE_FUNDING_RATE, trader_simulator
 
@@ -107,7 +107,8 @@ def test_get_fees_for_currency():
 
     fee2 = {
         enums.FeePropertyColumns.CURRENCY.value: "BTC",
-        enums.FeePropertyColumns.COST.value: 0
+        enums.FeePropertyColumns.COST.value: 0,
+        enums.FeePropertyColumns.IS_FROM_EXCHANGE.value: True
     }
     assert personal_data.get_fees_for_currency(fee2, "BTC") == 0
     assert personal_data.get_fees_for_currency(fee2, "BTC1") == 0
@@ -119,6 +120,7 @@ def test_get_fees_for_currency():
 def test_get_max_order_quantity_for_price_long_linear(future_trader_simulator_with_default_linear):
     # values also tested with bybit fees
     config, exchange_manager_inst, trader_inst, default_contract = future_trader_simulator_with_default_linear
+    set_future_exchange_fees(exchange_manager_inst.exchange.connector, default_contract.pair)
 
     # # no need to initialize the position
     default_contract.set_current_leverage(constants.ONE)
@@ -171,6 +173,7 @@ def test_get_max_order_quantity_for_price_long_linear(future_trader_simulator_wi
 def test_get_max_order_quantity_for_price_short_linear(future_trader_simulator_with_default_linear):
     # values also tested with bybit fees
     config, exchange_manager_inst, trader_inst, default_contract = future_trader_simulator_with_default_linear
+    set_future_exchange_fees(exchange_manager_inst.exchange.connector, default_contract.pair)
 
     # no need to initialize the position
     # Differs from long due to the position closing fees at liquidation price which are higher (price is higher)
@@ -216,6 +219,7 @@ def test_get_max_order_quantity_for_price_short_linear(future_trader_simulator_w
 def test_get_max_order_quantity_for_price_long_inverse(future_trader_simulator_with_default_inverse):
     # values also tested with bybit fees
     config, exchange_manager_inst, trader_inst, default_contract = future_trader_simulator_with_default_inverse
+    set_future_exchange_fees(exchange_manager_inst.exchange.connector, default_contract.pair)
 
     # no need to initialize the position
     default_contract.set_current_leverage(constants.ONE)
@@ -259,6 +263,7 @@ def test_get_max_order_quantity_for_price_long_inverse(future_trader_simulator_w
 def test_get_max_order_quantity_for_price_short_inverse(future_trader_simulator_with_default_inverse):
     # values also tested with bybit fees
     config, exchange_manager_inst, trader_inst, default_contract = future_trader_simulator_with_default_inverse
+    set_future_exchange_fees(exchange_manager_inst.exchange.connector, default_contract.pair)
 
     # no need to initialize the position
     # Differs from long due to the position closing fees at liquidation price which are higher (price is higher)
@@ -403,7 +408,7 @@ async def test_create_as_chained_order_bundled_order_no_open_order(trader_simula
 @pytest.mark.asyncio
 async def test_ensure_orders_relevancy_without_positions(trader_simulator):
     config, exchange_manager_inst, trader_inst = trader_simulator
-    order_mock = mock.Mock(exchange_manager=exchange_manager_inst, symbol="BTC/USD")
+    order_mock = Mock(exchange_manager=exchange_manager_inst, symbol="BTC/USD")
     exchange_manager_inst.exchange_personal_data.positions_manager.positions = {}
     # without positions: doing nothing
     async with personal_data.ensure_orders_relevancy(order=order_mock):
@@ -416,11 +421,11 @@ async def test_ensure_orders_relevancy_with_positions(future_trader_simulator_wi
     config, exchange_manager_inst, trader_inst, default_contract = future_trader_simulator_with_default_linear
     position = personal_data.LinearPosition(trader_inst, default_contract)
     position.symbol = DEFAULT_FUTURE_SYMBOL
-    order_mock = mock.Mock(exchange_manager=exchange_manager_inst, symbol=DEFAULT_FUTURE_SYMBOL)
-    trader_mock = mock.Mock(cancel_order=mock.AsyncMock())
-    group_mock = mock.Mock(on_cancel=mock.AsyncMock())
-    to_cancel_order_mock = mock.Mock(trader=trader_mock, order_group=group_mock, status=enums.OrderStatus.OPEN,
-                                     is_open=mock.Mock(return_value=True), reduce_only=True,
+    order_mock = Mock(exchange_manager=exchange_manager_inst, symbol=DEFAULT_FUTURE_SYMBOL)
+    trader_mock = Mock(cancel_order=AsyncMock())
+    group_mock = Mock(on_cancel=AsyncMock())
+    to_cancel_order_mock = Mock(trader=trader_mock, order_group=group_mock, status=enums.OrderStatus.OPEN,
+                                     is_open=Mock(return_value=True), reduce_only=True,
                                      symbol=DEFAULT_FUTURE_SYMBOL)
     # with positions
     exchange_manager_inst.exchange_personal_data.positions_manager.positions = {"BTC/USDT": position}

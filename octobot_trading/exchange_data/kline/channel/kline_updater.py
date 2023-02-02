@@ -62,14 +62,13 @@ class KlineUpdater(kline_channel.KlineProducer):
                     candle: list = await self.channel.exchange_manager.exchange.get_kline_price(pair, time_frame)
                     try:
                         candle = candle[0]
-                        self.channel.exchange_manager.exchange.uniformize_candles_if_necessary(candle)
                         await self.push(time_frame, pair, candle)
                     except TypeError:
                         pass
                     except IndexError:
                         quick_sleep = True
-                        self.logger.warning(f"Not enough data to compute kline data in {time_frame} for {pair}. "
-                                            f"Kline will be updated with the next refresh.")
+                        self.logger.debug(f"Not enough data to compute kline data in {time_frame} for {pair}. "
+                                          f"Kline will be updated with the next refresh.")
 
                 sleep_time = max((self.QUICK_KLINE_REFRESH_TIME if quick_sleep else self.refresh_time)
                                  - (time.time() - started_time), 0)

@@ -19,7 +19,6 @@ import concurrent.futures as futures
 import octobot_commons.thread_util as thread_util
 import octobot_trading.enums
 import octobot_trading.exchanges.abstract_websocket_exchange as abstract_websocket
-import octobot_trading.exchanges.connectors.abstract_websocket_connector as abstract_websocket_connector
 
 
 class WebSocketExchange(abstract_websocket.AbstractWebsocketExchange):
@@ -45,14 +44,23 @@ class WebSocketExchange(abstract_websocket.AbstractWebsocketExchange):
 
         self.restart_task = None
 
+    @classmethod
+    def get_exchange_connector_class(cls, exchange_manager):
+        raise NotImplementedError("get_exchange_connector_class is not implemented")
+
+    def create_feeds(self):
+        raise NotImplementedError("create_feeds is not implemented")
+
     async def init_websocket(self, time_frames, trader_pairs, tentacles_setup_config):
         self.websocket_connector = self.get_exchange_connector_class(self.exchange_manager)
+        self.websocket_connector.update_exchange_feeds(self.exchange_manager)
         self.pairs = trader_pairs
         self.time_frames = time_frames
 
         if self.pairs:
             # unauthenticated
             await self.add_feed(octobot_trading.enums.WebsocketFeeds.TRADES)
+            await self.add_feed(octobot_trading.enums.WebsocketFeeds.L1_BOOK)
             await self.add_feed(octobot_trading.enums.WebsocketFeeds.L2_BOOK)
             await self.add_feed(octobot_trading.enums.WebsocketFeeds.L3_BOOK)
             await self.add_feed(octobot_trading.enums.WebsocketFeeds.BOOK_DELTA)
@@ -75,6 +83,9 @@ class WebSocketExchange(abstract_websocket.AbstractWebsocketExchange):
             await self.add_feed(octobot_trading.enums.WebsocketFeeds.PORTFOLIO)
             await self.add_feed(octobot_trading.enums.WebsocketFeeds.TRADE)
             await self.add_feed(octobot_trading.enums.WebsocketFeeds.ORDERS)
+            await self.add_feed(octobot_trading.enums.WebsocketFeeds.CREATE_ORDER)
+            await self.add_feed(octobot_trading.enums.WebsocketFeeds.CANCEL_ORDER)
+            await self.add_feed(octobot_trading.enums.WebsocketFeeds.LEDGER)
 
             # ensure feeds are added
             self.create_feeds()
@@ -109,35 +120,18 @@ class WebSocketExchange(abstract_websocket.AbstractWebsocketExchange):
     def has_name(cls, exchange_manager: object) -> bool:  # pylint: disable=arguments-renamed
         return cls.get_exchange_connector_class(exchange_manager) is not None
 
-    def create_feeds(self):
-        raise NotImplementedError("create_feeds is not implemented")
-
-    @classmethod
-    def get_exchange_connector_class(cls, exchange_manager: object):
-        raise NotImplementedError("get_exchange_connector_class is not implemented")
-
-    @staticmethod
-    def get_websocket_client(config, exchange_manager):
-        raise NotImplementedError("get_websocket_client is not implemented")
-
-    @classmethod
-    def get_class_method_name_to_get_compatible_websocket(cls, exchange_manager: object) -> str:
-        if exchange_manager.is_future:
-            return abstract_websocket_connector.AbstractWebsocketConnector.is_handling_future.__name__
-        if exchange_manager.is_margin:
-            return abstract_websocket_connector.AbstractWebsocketConnector.is_handling_margin.__name__
-        return abstract_websocket_connector.AbstractWebsocketConnector.is_handling_spot.__name__
-
     async def start_sockets(self):
         if any(self.handled_feeds.values() and self.websocket_connectors):
             try:
                 self.websocket_connectors_executors = futures.ThreadPoolExecutor(
                     max_workers=len(self.websocket_connectors),
-                    thread_name_prefix=f"{self.get_name()}-{self.exchange_name}-pool-executor")
+                    thread_name_prefix=f"{self.get_name()}-{self.exchange_name}-pool-executor"
+                )
 
                 self.websocket_connectors_tasks = [
                     asyncio.get_event_loop().run_in_executor(self.websocket_connectors_executors, websocket.start)
-                    for websocket in self.websocket_connectors]
+                    for websocket in self.websocket_connectors
+                ]
 
                 self.is_websocket_running = True
             except ValueError as e:
@@ -150,18 +144,37 @@ class WebSocketExchange(abstract_websocket.AbstractWebsocketExchange):
     async def wait_sockets(self):
         await asyncio.wait(self.websocket_connectors_tasks)
 
+    def _supports_live_pair_addition(self):
+        for websocket in self.websocket_connectors:
+            if not websocket.SUPPORTS_LIVE_PAIR_ADDITION:
+                return False
+        return True
+
+    async def updated_followed_pairs(self):
+        for websocket in self.websocket_connectors:
+            websocket.update_followed_pairs()
+
     async def _inner_close_and_restart_sockets(self, debounce_duration):
         # asyncio.sleep to make it easily cancellable to reschedule later calls
         await asyncio.sleep(debounce_duration)
         for websocket in self.websocket_connectors:
             await websocket.reset()
 
-    async def close_and_restart_sockets(self, debounce_duration=0):
+    async def handle_new_pairs(self, debounce_duration=0):
+        if self._supports_live_pair_addition():
+            await self.updated_followed_pairs()
+        else:
+            await self._close_and_restart_sockets(debounce_duration=debounce_duration)
+
+    async def _close_and_restart_sockets(self, debounce_duration=0):
         if self.restart_task is not None and not self.restart_task.done():
             self.restart_task.cancel()
         self.restart_task = asyncio.create_task(self._inner_close_and_restart_sockets(debounce_duration))
 
     async def stop_sockets(self):
+        """
+        Stops the websocket. Can be restarted
+        """
         try:
             for websocket in self.websocket_connectors:
                 await websocket.stop()
@@ -169,6 +182,9 @@ class WebSocketExchange(abstract_websocket.AbstractWebsocketExchange):
             self.logger.error(f"Error when stopping sockets : {e}")
 
     async def close_sockets(self):
+        """
+        Closes the websocket. Can't be restarted
+        """
         try:
             for websocket in self.websocket_connectors:
                 await websocket.close()
@@ -182,9 +198,6 @@ class WebSocketExchange(abstract_websocket.AbstractWebsocketExchange):
     def add_pairs(self, pairs, watching_only=False):
         for websocket in self.websocket_connectors:
             websocket.add_pairs(pairs, watching_only=watching_only)
-
-    def is_handling(self, feed_name):
-        return feed_name in self.handled_feeds[feed_name] and self.handled_feeds[feed_name]
 
     def clear(self):
         super(WebSocketExchange, self).clear()

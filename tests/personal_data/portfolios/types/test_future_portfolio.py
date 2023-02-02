@@ -27,7 +27,7 @@ from octobot_trading.personal_data import FuturePortfolio, BuyMarketOrder, SellM
     StopLossOrder, LinearPosition, InversePosition, get_max_order_quantity_for_price
 
 from tests import event_loop
-from tests.exchanges import future_simulated_exchange_manager
+from tests.exchanges import future_simulated_exchange_manager, set_future_exchange_fees
 from tests.exchanges.traders import future_trader, future_trader_simulator_with_default_linear, DEFAULT_FUTURE_SYMBOL, \
     DEFAULT_FUTURE_SYMBOL_MARGIN_TYPE, DEFAULT_FUTURE_SYMBOL_LEVERAGE, future_trader_simulator_with_default_inverse
 from tests.test_utils.order_util import fill_market_order
@@ -52,6 +52,7 @@ async def test_initial_portfolio(future_trader_simulator_with_default_linear):
 async def test_update_future_portfolio_from_order(
         future_trader_simulator_with_default_linear):
     config, exchange_manager_inst, trader_inst, default_contract = future_trader_simulator_with_default_linear
+    set_future_exchange_fees(exchange_manager_inst.exchange.connector, default_contract.pair)
     portfolio_manager = exchange_manager_inst.exchange_personal_data.portfolio_manager
     default_contract.set_current_leverage(decimal.Decimal(2))
 
@@ -327,6 +328,7 @@ async def test_update_portfolio_data_from_order_that_triggers_negative_portfolio
 async def test_update_portfolio_data_from_order_with_cancelled_and_filled_orders_linear_contract(
         future_trader_simulator_with_default_linear):
     config, exchange_manager_inst, trader_inst, default_contract = future_trader_simulator_with_default_linear
+    set_future_exchange_fees(exchange_manager_inst.exchange.connector, default_contract.pair)
     portfolio_manager = exchange_manager_inst.exchange_personal_data.portfolio_manager
     default_contract.set_current_leverage(decimal.Decimal(5))
 
@@ -383,6 +385,7 @@ async def test_update_portfolio_data_from_order_with_cancelled_and_filled_orders
 async def test_update_portfolio_data_from_orders_with_max_long_size_linear_contract(
         future_trader_simulator_with_default_linear):
     config, exchange_manager_inst, trader_inst, default_contract = future_trader_simulator_with_default_linear
+    set_future_exchange_fees(exchange_manager_inst.exchange.connector, default_contract.pair)
     portfolio_manager = exchange_manager_inst.exchange_personal_data.portfolio_manager
     leverage = decimal.Decimal(2)
     default_contract.set_current_leverage(leverage)
@@ -493,6 +496,7 @@ async def test_update_portfolio_data_from_orders_with_max_long_size_linear_contr
 async def test_update_portfolio_data_from_orders_with_max_short_size_linear_contract(
         future_trader_simulator_with_default_linear):
     config, exchange_manager_inst, trader_inst, default_contract = future_trader_simulator_with_default_linear
+    set_future_exchange_fees(exchange_manager_inst.exchange.connector, default_contract.pair)
     portfolio_manager = exchange_manager_inst.exchange_personal_data.portfolio_manager
     leverage = decimal.Decimal(2)
     default_contract.set_current_leverage(leverage)
@@ -593,6 +597,7 @@ async def test_update_portfolio_data_from_orders_with_max_short_size_linear_cont
 async def test_update_portfolio_data_from_orders_with_max_long_size_inverse_contract(
         future_trader_simulator_with_default_inverse):
     config, exchange_manager_inst, trader_inst, default_contract = future_trader_simulator_with_default_inverse
+    set_future_exchange_fees(exchange_manager_inst.exchange.connector, default_contract.pair)
     portfolio_manager = exchange_manager_inst.exchange_personal_data.portfolio_manager
     leverage = decimal.Decimal(5)
     default_contract.set_current_leverage(leverage)
@@ -699,6 +704,7 @@ async def test_update_portfolio_data_from_orders_with_max_long_size_inverse_cont
 async def test_update_portfolio_data_from_orders_with_max_short_size_inverse_contract(
         future_trader_simulator_with_default_inverse):
     config, exchange_manager_inst, trader_inst, default_contract = future_trader_simulator_with_default_inverse
+    set_future_exchange_fees(exchange_manager_inst.exchange.connector, default_contract.pair)
     portfolio_manager = exchange_manager_inst.exchange_personal_data.portfolio_manager
     leverage = decimal.Decimal(3)
     default_contract.set_current_leverage(leverage)
@@ -800,6 +806,7 @@ async def test_update_portfolio_data_from_orders_with_max_short_size_inverse_con
 async def test_update_portfolio_data_from_order_with_huge_loss_on_filled_orders_linear_contract(
         future_trader_simulator_with_default_linear):
     config, exchange_manager_inst, trader_inst, default_contract = future_trader_simulator_with_default_linear
+    set_future_exchange_fees(exchange_manager_inst.exchange.connector, default_contract.pair)
     portfolio_manager = exchange_manager_inst.exchange_personal_data.portfolio_manager
     default_contract.set_current_leverage(decimal.Decimal(2))
 
@@ -865,6 +872,7 @@ async def test_update_portfolio_data_from_order_with_huge_loss_on_filled_orders_
 async def test_update_portfolio_from_liquidated_position_with_orders_on_short_position_linear_contract(
         future_trader_simulator_with_default_linear):
     config, exchange_manager_inst, trader_inst, default_contract = future_trader_simulator_with_default_linear
+    set_future_exchange_fees(exchange_manager_inst.exchange.connector, default_contract.pair)
     portfolio_manager = exchange_manager_inst.exchange_personal_data.portfolio_manager
     default_contract.set_current_leverage(decimal.Decimal(50))
     trader_inst.exchange_manager.exchange.set_pair_future_contract(DEFAULT_FUTURE_SYMBOL, default_contract)
@@ -1055,6 +1063,7 @@ async def test_update_portfolio_from_funding_with_short_position(
 
 async def test_update_portfolio_data_with_fees(future_trader_simulator_with_default_linear):
     config, exchange_manager_inst, trader_inst, default_contract = future_trader_simulator_with_default_linear
+    set_future_exchange_fees(exchange_manager_inst.exchange.connector, default_contract.pair)
     portfolio_manager = exchange_manager_inst.exchange_personal_data.portfolio_manager
     default_contract.set_current_leverage(decimal.Decimal(10))
 
@@ -1089,6 +1098,7 @@ async def test_update_portfolio_data_with_fees(future_trader_simulator_with_defa
 
 async def test_update_portfolio_data_with_fees_long_position(future_trader_simulator_with_default_linear):
     config, exchange_manager_inst, trader_inst, default_contract = future_trader_simulator_with_default_linear
+    set_future_exchange_fees(exchange_manager_inst.exchange.connector, default_contract.pair)
     portfolio_manager = exchange_manager_inst.exchange_personal_data.portfolio_manager
     leverage = decimal.Decimal(2)
     default_contract.set_current_leverage(leverage)
@@ -1184,6 +1194,7 @@ async def test_update_portfolio_data_with_fees_long_position(future_trader_simul
 async def test_update_portfolio_reduce_size_with_market_sell_long_linear_contract(
         future_trader_simulator_with_default_linear):
     config, exchange_manager_inst, trader_inst, default_contract = future_trader_simulator_with_default_linear
+    set_future_exchange_fees(exchange_manager_inst.exchange.connector, default_contract.pair)
     portfolio_manager = exchange_manager_inst.exchange_personal_data.portfolio_manager
     default_contract.set_current_leverage(decimal.Decimal(10))
 
@@ -1223,6 +1234,7 @@ async def test_update_portfolio_reduce_size_with_market_sell_long_linear_contrac
 async def test_update_portfolio_reduce_size_with_market_buy_short_linear_contract(
         future_trader_simulator_with_default_linear):
     config, exchange_manager_inst, trader_inst, default_contract = future_trader_simulator_with_default_linear
+    set_future_exchange_fees(exchange_manager_inst.exchange.connector, default_contract.pair)
     portfolio_manager = exchange_manager_inst.exchange_personal_data.portfolio_manager
     default_contract.set_current_leverage(decimal.Decimal(10))
 
@@ -1306,4 +1318,5 @@ def _disable_fees(exchange_manager):
         enums.FeePropertyColumns.CURRENCY.value: "USDT",
         enums.FeePropertyColumns.RATE.value: 0,
         enums.FeePropertyColumns.COST.value: constants.ZERO,
+        enums.FeePropertyColumns.IS_FROM_EXCHANGE.value: False,
     })

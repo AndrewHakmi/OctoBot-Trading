@@ -4,6 +4,145 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.15] - 2023-01-30
+### Updated
+- [FuturesTrading] Make contract error more understandable
+
+## [2.3.14] - 2023-01-30
+### Updated
+- [Exchanges] Remove kline warning, replace it by debug log
+
+## [2.3.13] - 2023-01-27
+### Updated
+- [Exchanges] Improve futures support
+- [Websockets] Reconnect error management
+
+## [2.3.12] - 2023-01-25
+### Fixed
+- [Websockets] Recreate a full ccxt client on reconnection
+
+## [2.3.11] - 2023-01-23
+### Fixed
+- [Websockets] Reconnection on long lasting connections
+
+## [2.3.10] - 2023-01-18
+### Fixed
+- [Ticker] Simulated ticker
+
+## [2.3.9] - 2023-01-18
+### Added
+- [Storage] Add authenticated data call on portfolio and trades update
+
+## [2.3.8] - 2023-01-15
+### Fixed
+- [CandlesManager] Typing issue
+
+## [2.3.7] - 2023-01-11
+### Updated
+- [Orders] Properly handle pending creation orders for exchanges that work this way (ex: bybit)
+### Fixed
+- [Orders] Initial open order fetch timeout error### Fixed
+- [Adapters] Ticker, OHLCV and order issues
+
+## [2.3.6] - 2023-01-09
+### Added
+- [Config] Log trading mode and exchange config on load
+### Updated
+- [Exchanges] Migrate from cryptofeed to ccxt_pro for websocket exchanges
+
+## [2.3.5] - 2023-01-06
+### Updated
+- [Exchanges] Refactor exchanges to simplify into rest exchange, connectors and adapters
+
+## [2.3.4] - 2023-01-02
+### Updated
+- [CCXT] bump to 2.4.60
+
+## [2.3.3] - 2023-01-01
+### Updated
+- [API] add exchange data getter
+
+## [2.3.2] - 2022-12-28
+### Updated
+- [CandlesManager] do not use cython memory view
+### Fixed
+- [PreloadedCandlesManager] typing issues
+
+## [2.3.1] - 2022-12-24
+### Added
+- [TradingMode] cache and plot clear methods
+
+## [2.3.0] - 2022-12-23
+### Added
+- [Trader] backtesting optimizations
+### Updated
+- [Requirements] Bump
+
+## [2.2.37] - 2022-12-13
+### Fixed
+- [Trader] cancel order TypeError
+
+## [2.2.36] - 2022-12-10
+### Updated
+- [PortfolioHistory] store at the end of the backtest only
+
+## [2.2.35] - 2022-12-08
+### Added
+- [Orders] custom price in quantity computation
+
+## [2.2.34] - 2022-12-08
+### Added
+- [Orders] handling of pending cancel state
+### Updated
+- [CCXT] to 2.2.84
+
+## [2.2.33] - 2022-12-06
+### Fixed
+- Position entry price on first update
+- Cleared order exchange synchronization
+
+### Updated
+- CI spot tests to binanceus and future tests to bybit
+- Renamed `get_symbol_positions` to `get_position`
+
+## [2.2.32] - 2022-11-28
+### Updated
+- exchanges API
+
+## [2.2.31] - 2022-11-22
+### Added
+- Trading mode order quantity user input
+
+## [2.2.30] - 2022-11-19
+### Updated
+- trading modes API
+
+## [2.2.29] - 2022-11-11
+### Fixed
+- Stop loss related crash
+
+## [2.2.28] - 2022-11-01
+### Fixed
+- Order decimal rounding
+
+## [2.2.27] - 2022-10-31
+### Fixed
+- Send signal on order group callbacks
+
+## [2.2.26] - 2022-10-31
+### Updated
+- Cryptofeed version
+
+## [2.2.25] - 2022-10-23
+### Added
+- Environment variables for ccxt common options
+
+## [2.2.24] - 2022-10-28
+### Added
+- get minimal order amount
+### Fixed
+- portfolio attribute error
+
 ## [2.2.23] - 2022-10-23
 ### Fixed
 - trading mode user inputs

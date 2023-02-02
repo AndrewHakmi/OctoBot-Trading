@@ -24,7 +24,10 @@ class FillOrderState(order_state.OrderState):
     def __init__(self, order, is_from_exchange_data):
         super().__init__(order, is_from_exchange_data)
         self.state = enums.OrderStates.FILLING \
-            if ((not self.order.simulated and not self.is_status_filled()) or self.is_status_pending()) \
+            if ((
+                    (not self.order.simulated and not self.order.is_self_managed())
+                    and not self.is_status_filled()
+                ) or self.is_status_pending()) \
             else enums.OrderStates.FILLED
 
     async def initialize_impl(self, forced=False) -> None:
@@ -44,6 +47,13 @@ class FillOrderState(order_state.OrderState):
 
     def is_status_filled(self) -> bool:
         return not self.is_status_pending() and self.order.status in constants.FILL_ORDER_STATUS_SCOPE
+
+    def allows_new_status(self, status) -> bool:
+        """
+        Don't allow going from filling to open
+        :return: True if the given status is compatible with the current state
+        """
+        return status in constants.FILL_ORDER_STATUS_SCOPE or status in constants.CANCEL_ORDER_STATUS_SCOPE
 
     async def on_refresh_successful(self):
         """
@@ -79,18 +89,22 @@ class FillOrderState(order_state.OrderState):
 
             # compute trading fees
             try:
-                if self.order.exchange_manager is not None:
+                if self.order.exchange_manager is not None and not self.order.has_exchange_fetched_fees():
                     self.order.fee = self.order.get_computed_fee()
             except KeyError:
                 self.get_logger().error(f"Fail to compute trading fees for {self.order}.")
 
+            self.ensure_not_cleared(self.order)
             async with order_util.ensure_orders_relevancy(order=self.order):
                 # Trigger order group
                 if self.order.order_group:
                     await self.order.order_group.on_fill(self.order)
 
+                # always make sure this order has not been cleared when the is a risk to avoid AttributeError
+                self.ensure_not_cleared(self.order)
                 # update portfolio with filled order and position if any
                 async with self.order.exchange_manager.exchange_personal_data.portfolio_manager.portfolio.lock:
+                    self.ensure_not_cleared(self.order)
                     await self.order.exchange_manager.exchange_personal_data.handle_portfolio_update_from_order(
                         self.order)
 

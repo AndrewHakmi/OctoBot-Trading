@@ -38,7 +38,7 @@ pytestmark = pytest.mark.asyncio
 
 class TestTradeFactory:
     DEFAULT_SYMBOL = "BTC/USDT"
-    EXCHANGE_MANAGER_CLASS_STRING = "binance"
+    EXCHANGE_MANAGER_CLASS_STRING = "binanceus"
 
     @staticmethod
     async def init_default():
@@ -97,7 +97,8 @@ class TestTradeFactory:
         assert trade.fee == {
             FeePropertyColumns.COST.value: decimal.Decimal("0.0015"),
             FeePropertyColumns.CURRENCY.value: "ETH",
-            FeePropertyColumns.RATE.value: 0.002
+            FeePropertyColumns.RATE.value: 0.002,
+            FeePropertyColumns.IS_FROM_EXCHANGE.value: True
         }
         assert trade.is_closing_order is True
         assert trade.tag is None
@@ -166,7 +167,7 @@ class TestTradeFactory:
             'timestamp': 1637579281.377,
             'datetime': '2021-11-22T11:08:01.377Z',
             'lastTradeTimestamp': None,
-            'symbol': 'WIN/USDT',
+            'symbol': 'UNI/USDT',
             'type': 'market',
             'timeInForce': 'GTC',
             'postOnly': False,
@@ -189,7 +190,7 @@ class TestTradeFactory:
         assert trade.trade_id == '362550114'
         assert trade.origin_order_id == '362550114'
         assert trade.trade_type == TraderOrderType.SELL_MARKET
-        assert trade.symbol == 'WIN/USDT'
+        assert trade.symbol == 'UNI/USDT'
         assert trade.total_cost == ZERO
         assert trade.executed_quantity == decimal.Decimal("44964.0")
         assert trade.origin_quantity == decimal.Decimal("44964.0")

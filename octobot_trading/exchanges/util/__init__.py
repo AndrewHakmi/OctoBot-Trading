@@ -21,9 +21,7 @@ from octobot_trading.exchanges.util.exchange_market_status_fixer import (
 )
 from octobot_trading.exchanges.util import exchange_util
 from octobot_trading.exchanges.util.exchange_util import (
-    get_margin_exchange_class,
-    get_future_exchange_class,
-    get_spot_exchange_class,
+    get_rest_exchange_class,
     get_order_side,
     log_time_sync_error,
     get_partners_explanation_message,
@@ -45,9 +43,7 @@ from octobot_trading.exchanges.util.websockets_util import (
 __all__ = [
     "ExchangeMarketStatusFixer",
     "is_ms_valid",
-    "get_margin_exchange_class",
-    "get_future_exchange_class",
-    "get_spot_exchange_class",
+    "get_rest_exchange_class",
     "get_order_side",
     "log_time_sync_error",
     "get_partners_explanation_message",

@@ -28,6 +28,7 @@ import octobot_trading.exchange_data as exchange_data
 class AbstractWebsocketExchange:
     __metaclass__ = abc.ABCMeta
 
+    REQUIRED_ACTIVATED_TENTACLES = []
     EXCHANGE_FEEDS = {}
 
     INIT_REQUIRING_EXCHANGE_FEEDS = set()
@@ -35,9 +36,9 @@ class AbstractWebsocketExchange:
     # Used to ignore a feed when at least one of the corresponding feed is supported
     IGNORED_FEED_PAIRS = {}
 
-    def __init__(self,
-                 config: object,
-                 exchange_manager: object):
+    SUPPORTS_LIVE_PAIR_ADDITION = False
+
+    def __init__(self, config, exchange_manager):
         self.config = config
 
         self.exchange_manager = exchange_manager
@@ -64,12 +65,18 @@ class AbstractWebsocketExchange:
         self.time_frames = time_frames if time_frames is not None else []
         self.currencies = currencies if currencies else []
 
+    @classmethod
+    def update_exchange_feeds(cls, exchange_manager):
+        """
+        Called before exchange instantiation, should be used to patch cls.EXCHANGE_FEEDS if necessary
+        """
+
     def get_exchange_credentials(self):
         """
         Exchange credentials
         :return: key, secret, password
         """
-        return self.exchange_manager.get_exchange_credentials(self.logger, self.exchange_manager.exchange_name)
+        return self.exchange_manager.get_exchange_credentials(self.exchange_manager.exchange_name)
 
     async def push_to_channel(self, channel_name, *args, **kwargs):
         try:
@@ -88,14 +95,6 @@ class AbstractWebsocketExchange:
     def has_name(cls, name: str) -> bool:
         raise NotImplementedError("has_name not implemented")
 
-    @staticmethod
-    def get_websocket_client(config, exchange_manager):
-        raise NotImplementedError("get_websocket_client not implemented")
-
-    @abc.abstractmethod
-    def is_handling(self, feed_name):
-        raise NotImplementedError("is_handling not implemented")
-
     @abc.abstractmethod
     async def init_websocket(self, time_frames, trader_pairs, tentacles_setup_config):
         raise NotImplementedError("init_websocket not implemented")
@@ -109,40 +108,26 @@ class AbstractWebsocketExchange:
         raise NotImplementedError("wait_sockets not implemented")
 
     @abc.abstractmethod
-    async def subscribe(self):
-        raise NotImplementedError("subscribe is not implemented")
+    def update_followed_pairs(self):
+        raise NotImplementedError("updated_followed_pairs not implemented")
 
     @abc.abstractmethod
-    async def close_and_restart_sockets(self, debounce_duration=0):
-        raise NotImplementedError("close_and_restart_sockets not implemented")
+    async def _close_and_restart_sockets(self, debounce_duration=0):
+        raise NotImplementedError("_close_and_restart_sockets not implemented")
 
     @abc.abstractmethod
     async def stop_sockets(self):
+        """
+        Stops the websocket. Can be restarted
+        """
         raise NotImplementedError("stop_sockets not implemented")
 
     @abc.abstractmethod
     async def close_sockets(self):
+        """
+        Closes the websocket. Can't be restarted
+        """
         raise NotImplementedError("close_sockets not implemented")
-
-    @abc.abstractmethod
-    async def do_auth(self):
-        NotImplementedError("do_auth is not implemented")
-
-    @classmethod
-    def is_handling_spot(cls) -> bool:
-        return False
-
-    @classmethod
-    def is_handling_margin(cls) -> bool:
-        return False
-
-    @classmethod
-    def is_handling_future(cls) -> bool:
-        return False
-
-    @classmethod
-    def get_feeds(cls) -> dict:
-        return cls.EXCHANGE_FEEDS
 
     @classmethod
     def get_exchange_feed(cls, feed) -> str:
@@ -166,9 +151,9 @@ class AbstractWebsocketExchange:
         ignored_feed_candidate_list = cls.IGNORED_FEED_PAIRS.get(feed, [])
         if not ignored_feed_candidate_list:
             return False
-        for feed_candidate in list(cls.EXCHANGE_FEEDS.keys()):
+        for feed_candidate, feed_value in cls.EXCHANGE_FEEDS.items():
             if feed_candidate in ignored_feed_candidate_list and \
-                    cls.is_feed_supported(cls.EXCHANGE_FEEDS[feed_candidate]):
+                    cls.is_feed_supported(feed_value):
                 return True
         return False
 
@@ -177,7 +162,7 @@ class AbstractWebsocketExchange:
         if not self.is_feed_supported(feed_name):
             self.logger.error("{} is not supported on {}".format(feed, self.get_name()))
             raise ValueError(f"{feed} is not supported on {self.get_name()}")
-        return feed_name
+        return feed
 
     def get_book_instance(self, symbol):
         try:

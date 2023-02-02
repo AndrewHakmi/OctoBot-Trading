@@ -127,6 +127,20 @@ class CandlesManager(util.Initializable):
         self._set_all_candles(all_candles_data)
         self.candles_initialized = True
 
+    def upsert_candle(self, updated_candle):
+        updated_candle_time = updated_candle[enums.PriceIndexes.IND_PRICE_TIME.value]
+        for index, candle_time in enumerate(self.time_candles):
+            if candle_time == updated_candle_time:
+                self.close_candles[index] = updated_candle[enums.PriceIndexes.IND_PRICE_CLOSE.value]
+                self.open_candles[index] = updated_candle[enums.PriceIndexes.IND_PRICE_OPEN.value]
+                self.high_candles[index] = updated_candle[enums.PriceIndexes.IND_PRICE_HIGH.value]
+                self.low_candles[index] = updated_candle[enums.PriceIndexes.IND_PRICE_LOW.value]
+                self.volume_candles[index] = updated_candle[enums.PriceIndexes.IND_PRICE_VOL.value]
+                return
+
+        # candle not in db, add it
+        self.add_new_candle(updated_candle)
+
     def add_old_and_new_candles(self, candles_data):
         """
         Same as add_new_candle but also checks if old candles are missing
@@ -155,7 +169,7 @@ class CandlesManager(util.Initializable):
                 self.open_candles[self.open_candles_index] = new_candle_data[enums.PriceIndexes.IND_PRICE_OPEN.value]
                 self.high_candles[self.high_candles_index] = new_candle_data[enums.PriceIndexes.IND_PRICE_HIGH.value]
                 self.low_candles[self.low_candles_index] = new_candle_data[enums.PriceIndexes.IND_PRICE_LOW.value]
-                self.time_candles[self.time_candles_index] = new_candle_data[enums.PriceIndexes.IND_PRICE_TIME.value]
+                self.time_candles[self.time_candles_index] = float(new_candle_data[enums.PriceIndexes.IND_PRICE_TIME.value])
                 self.volume_candles[self.volume_candles_index] = new_candle_data[enums.PriceIndexes.IND_PRICE_VOL.value]
                 self._inc_candle_index()
             except IndexError as e:
@@ -199,10 +213,10 @@ class CandlesManager(util.Initializable):
         max_handled_limit: int = self.max_candles_count if self.reached_max else max_limit
         if limit == -1:
             if max_limit == -1:
-                return np.array(data)
-            return np.array(data[:max_handled_limit])
+                return np.array(data, dtype=np.float64)
+            return np.array(data[:max_handled_limit], dtype=np.float64)
 
         if max_limit == -1:
-            return np.array(data[-min(limit, len(data)):])
+            return np.array(data[-min(limit, len(data)):], dtype=np.float64)
         else:
-            return np.array(data[max(0, max_handled_limit - limit): max_handled_limit])
+            return np.array(data[max(0, max_handled_limit - limit): max_handled_limit], dtype=np.float64)

@@ -119,8 +119,9 @@ async def get_up_to_date_price(exchange_manager, symbol: str, timeout: int = Non
 
 
 async def get_pre_order_data(exchange_manager, symbol: str, timeout: int = None,
-                             portfolio_type=commons_constants.PORTFOLIO_AVAILABLE):
-    mark_price = await get_up_to_date_price(exchange_manager, symbol, timeout=timeout)
+                             portfolio_type=commons_constants.PORTFOLIO_AVAILABLE,
+                             target_price=None):
+    price = target_price or await get_up_to_date_price(exchange_manager, symbol, timeout=timeout)
     symbol_market = exchange_manager.exchange.get_market_status(symbol, with_fixer=False)
 
     currency, market = symbol_util.parse_symbol(symbol).base_and_quote()
@@ -136,13 +137,13 @@ async def get_pre_order_data(exchange_manager, symbol: str, timeout: int = None,
             currency_available *= pair_future_contract.current_leverage
             market_quantity = market_available = currency_available
         else:
-            market_available *= pair_future_contract.current_leverage / mark_price
+            market_available *= pair_future_contract.current_leverage / price
             market_quantity = currency_available = market_available
     elif exchange_manager.is_margin:
         market_quantity = constants.ZERO  # TODO
     else:
-        market_quantity = market_available / mark_price if mark_price else constants.ZERO
-    return currency_available, market_available, market_quantity, mark_price, symbol_market
+        market_quantity = market_available / price if price else constants.ZERO
+    return currency_available, market_available, market_quantity, price, symbol_market
 
 
 def get_futures_max_order_size(exchange_manager, symbol, side, current_price, reduce_only,
@@ -223,9 +224,18 @@ def get_fees_for_currency(fee, currency):
 
 def parse_raw_fees(raw_fees):
     fees = raw_fees
-    if fees and enums.ExchangeConstantsOrderColumns.COST.value in fees:
-        raw_fees[enums.ExchangeConstantsOrderColumns.COST.value] = \
-            decimal.Decimal(str(raw_fees[enums.ExchangeConstantsOrderColumns.COST.value]))
+    if fees:
+        # parsed fees should be from exchange by default
+        fees[enums.FeePropertyColumns.IS_FROM_EXCHANGE.value] = \
+            fees.get(enums.FeePropertyColumns.IS_FROM_EXCHANGE.value, True)
+        if enums.FeePropertyColumns.COST.value in fees:
+            try:
+                raw_fees[enums.FeePropertyColumns.COST.value] = \
+                    decimal.Decimal(str(raw_fees[enums.FeePropertyColumns.COST.value]))
+            except decimal.InvalidOperation:
+                # Ensure fee cost can be used in computations. The original value is kept
+                # under the EXCHANGE_ORIGINAL_COST key if relevant
+                raw_fees[enums.FeePropertyColumns.COST.value] = constants.ZERO
     return fees
 
 
@@ -246,6 +256,10 @@ def parse_is_cancelled(raw_order):
     return parse_order_status(raw_order) in {enums.OrderStatus.CANCELED, enums.OrderStatus.CLOSED}
 
 
+def parse_is_open(raw_order):
+    return parse_order_status(raw_order) is enums.OrderStatus.OPEN
+
+
 def get_pnl_transaction_source_from_order(order):
     if order.order_type in [enums.TraderOrderType.SELL_MARKET, enums.TraderOrderType.BUY_MARKET,
                             enums.TraderOrderType.TAKE_PROFIT]:
@@ -261,6 +275,26 @@ def get_pnl_transaction_source_from_order(order):
 def is_stop_order(order_type):
     return order_type in [enums.TraderOrderType.STOP_LOSS, enums.TraderOrderType.STOP_LOSS_LIMIT,
                           enums.TraderOrderType.TRAILING_STOP, enums.TraderOrderType.TRAILING_STOP_LIMIT]
+
+
+def get_trade_order_type(order_type: enums.TraderOrderType):
+    if order_type in (enums.TraderOrderType.BUY_MARKET, enums.TraderOrderType.SELL_MARKET):
+        return enums.TradeOrderType.MARKET
+    if order_type in (enums.TraderOrderType.BUY_LIMIT, enums.TraderOrderType.SELL_LIMIT):
+        return enums.TradeOrderType.LIMIT
+    if order_type is enums.TraderOrderType.STOP_LOSS:
+        return enums.TradeOrderType.STOP_LOSS
+    if order_type is enums.TraderOrderType.TRAILING_STOP:
+        return enums.TradeOrderType.TRAILING_STOP
+    if order_type is enums.TraderOrderType.STOP_LOSS_LIMIT:
+        return enums.TradeOrderType.STOP_LOSS_LIMIT
+    if order_type is enums.TraderOrderType.TRAILING_STOP_LIMIT:
+        return enums.TradeOrderType.TRAILING_STOP_LIMIT
+    if order_type is enums.TraderOrderType.TAKE_PROFIT:
+        return enums.TradeOrderType.TAKE_PROFIT
+    if order_type is enums.TraderOrderType.TAKE_PROFIT_LIMIT:
+        return enums.TradeOrderType.TAKE_PROFIT_LIMIT
+    raise ValueError(order_type)
 
 
 async def create_as_chained_order(order):
@@ -287,11 +321,13 @@ async def create_as_chained_order(order):
 
 
 def is_associated_pending_order(pending_order, created_order):
-    return created_order.symbol == pending_order.symbol and \
-           created_order.origin_quantity == pending_order.origin_quantity and \
-           created_order.origin_price == pending_order.origin_price and \
-           created_order.__class__ is pending_order.__class__ and \
-           created_order.trader is pending_order.trader
+    return created_order.order_id == pending_order.order_id or (
+        created_order.symbol == pending_order.symbol and
+        created_order.origin_quantity == pending_order.origin_quantity and
+        created_order.origin_price == pending_order.origin_price and
+        created_order.__class__ is pending_order.__class__ and
+        created_order.trader is pending_order.trader
+    )
 
 
 async def apply_pending_order_from_created_order(pending_order, created_order, to_be_initialized):
@@ -342,17 +378,15 @@ async def _cancel_reduce_only_orders_on_position_reset(exchange_manager, symbol)
                 await order.order_group.on_cancel(order)
 
 
-def get_order_quantity_currency(exchange_manager, symbol, side):
+def get_order_quantity_currency(exchange_manager, symbol):
     try:
-        base, quote = symbol_util.parse_symbol(symbol).base_and_quote()
+        parsed_symbol = symbol_util.parse_symbol(symbol)
+        base, quote = parsed_symbol.base_and_quote()
     except ValueError:
         # symbol that can't be split
         return None
     if exchange_manager.is_future:
-        position = exchange_manager.exchange_personal_data.positions_manager.get_symbol_position(
-            symbol, side
-        )
-        return quote if position.symbol_contract.is_inverse_contract() else base
+        return quote if parsed_symbol.is_inverse() else base
     # always base in spot
     return base
 

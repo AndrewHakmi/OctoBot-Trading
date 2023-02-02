@@ -20,7 +20,6 @@ from octobot_trading.enums import ExchangeConstantsMarketStatusColumns as Ecmsc,
     ExchangeConstantsOrderBookInfoColumns as Ecobic, ExchangeConstantsOrderColumns as Ecoc, \
     ExchangeConstantsTickersColumns as Ectc
 import octobot_trading.enums as trading_enums
-import octobot_trading.errors as errors
 from tests_additional.real_exchanges.real_exchange_tester import RealExchangeTester
 # required to catch async loop context exceptions
 from tests import event_loop
@@ -101,6 +100,17 @@ class TestBybitRealExchangeTester(RealExchangeTester):
         # check last candle is the current candle
         assert symbol_prices[-1][PriceIndexes.IND_PRICE_TIME.value] >= self.get_time() - self.get_allowed_time_delta()
 
+        # try with since and limit (used in data collector)
+        assert await self.get_symbol_prices(since=self.CANDLE_SINCE, limit=50) == []
+        # "end" param is required: add in tentacle
+        symbol_prices = await self.get_symbol_prices(since=self.CANDLE_SINCE, limit=50, end=self.get_ms_time())
+        assert len(symbol_prices) == 50
+        # check candles order (oldest first)
+        self.ensure_elements_order(symbol_prices, PriceIndexes.IND_PRICE_TIME.value)
+        # check last candle is the current candle
+        for candle in symbol_prices:
+            assert candle[PriceIndexes.IND_PRICE_TIME.value] >= self.CANDLE_SINCE_SEC
+
     async def test_get_kline_price(self):
         kline_price = await self.get_kline_price()
         assert len(kline_price) == 1
@@ -111,9 +121,9 @@ class TestBybitRealExchangeTester(RealExchangeTester):
 
     async def test_get_order_book(self):
         order_book = await self.get_order_book()
-        assert len(order_book[Ecobic.ASKS.value]) == 25
+        assert len(order_book[Ecobic.ASKS.value]) == 5
         assert len(order_book[Ecobic.ASKS.value][0]) == 2
-        assert len(order_book[Ecobic.BIDS.value]) == 25
+        assert len(order_book[Ecobic.BIDS.value]) == 5
         assert len(order_book[Ecobic.BIDS.value][0]) == 2
 
     async def test_get_recent_trades(self):

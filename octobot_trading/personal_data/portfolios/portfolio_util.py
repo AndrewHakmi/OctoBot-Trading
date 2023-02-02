@@ -42,6 +42,14 @@ def parse_decimal_config_portfolio(portfolio):
     }
 
 
+def filter_empty_values(portfolio):
+    return {
+        symbol: value
+        for symbol, value in portfolio.items()
+        if value[commons_constants.PORTFOLIO_TOTAL] > 0
+    }
+
+
 def portfolio_to_float(portfolio):
     float_portfolio = {}
     for symbol, symbol_balance in portfolio.items():
@@ -68,6 +76,9 @@ def get_draw_down(exchange_manager):
                 enums.PositionSide.BOTH
             ).symbol_contract.is_inverse_contract():
                 value_currency = symbol_util.parse_symbol(draw_down_pair).base
+            if exchange_manager.exchange_personal_data.portfolio_manager.portfolio_value_holder.origin_portfolio \
+                    is None:
+                return constants.ZERO
             origin_value = exchange_manager.exchange_personal_data.portfolio_manager.portfolio_value_holder \
                 .origin_portfolio.portfolio[value_currency].total
             portfolio_history = [origin_value]
@@ -80,7 +91,7 @@ def get_draw_down(exchange_manager):
 
                 draw_down = current_draw_down if current_draw_down > draw_down else draw_down
         except Exception as e:
-            commons_logging.get_logger(__name__).exception(e, True, f"Error when computing draw down: {e}")
+            commons_logging.get_logger(__name__).warning(f"Error when computing draw down: {e}")
     return draw_down
 
 

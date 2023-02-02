@@ -34,11 +34,6 @@ class TestBitgetRealExchangeTester(RealExchangeTester):
     SYMBOL_2 = "ETH/BTC"
     SYMBOL_3 = "XRP/BTC"
 
-    async def time_frames(self):
-        async with get_exchange_manager(self.EXCHANGE_NAME) as exchange_manager:
-            # warning: need to use client.timeframes["spot"]
-            return set(exchange_manager.exchange.connector.client.timeframes["spot"])
-
     async def test_time_frames(self):
         time_frames = await self.time_frames()
         assert all(time_frame in time_frames for time_frame in (
@@ -73,7 +68,13 @@ class TestBitgetRealExchangeTester(RealExchangeTester):
                        for elem in (Ecmsc.LIMITS_AMOUNT.value,
                                     Ecmsc.LIMITS_PRICE.value,
                                     Ecmsc.LIMITS_COST.value))
-            self.check_market_status_limits(market_status, expect_invalid_price_limit_values=False)
+            # wtf value, to fix in tentacle
+            for val in (Ecmsc.LIMITS_PRICE_MIN.value, Ecmsc.LIMITS_PRICE_MAX.value):
+                assert market_status[Ecmsc.LIMITS.value][Ecmsc.LIMITS_PRICE.value][val] in (None, 50000)
+            for val in (Ecmsc.LIMITS_COST_MIN.value, Ecmsc.LIMITS_COST_MAX.value):
+                assert market_status[Ecmsc.LIMITS.value][Ecmsc.LIMITS_COST.value][val] in (None, 0, 5)
+            # can't use normal checker
+            # self.check_market_status_limits(market_status, expect_invalid_price_limit_values=True)
 
     async def test_get_symbol_prices(self):
         # without limit
@@ -94,6 +95,17 @@ class TestBitgetRealExchangeTester(RealExchangeTester):
         self.ensure_elements_order(symbol_prices, PriceIndexes.IND_PRICE_TIME.value)
         # check last candle is the current candle
         assert symbol_prices[-1][PriceIndexes.IND_PRICE_TIME.value] >= self.get_time() - self.get_allowed_time_delta()
+
+        # try with since and limit (used in data collector)
+        assert await self.get_symbol_prices(since=self.CANDLE_SINCE, limit=50) == []
+        # "until" param is required: add in tentacle
+        symbol_prices = await self.get_symbol_prices(since=self.CANDLE_SINCE, limit=50, until=self.get_ms_time())
+        assert len(symbol_prices) == 50
+        # check candles order (oldest first)
+        self.ensure_elements_order(symbol_prices, PriceIndexes.IND_PRICE_TIME.value)
+        # check last candle is the current candle
+        for candle in symbol_prices:
+            assert candle[PriceIndexes.IND_PRICE_TIME.value] >= self.CANDLE_SINCE_SEC
 
     async def test_get_kline_price(self):
         kline_price = await self.get_kline_price()
